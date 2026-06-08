@@ -1,7 +1,7 @@
 {
   "name": "tokencompress",
   "version": "0.2.0",
-  "description": "Explainable LLM context compression — fewer tokens, same information, and a full report of exactly what was dropped and why.",
+  "description": "Removes redundant tokens from LLM inputs before they hit the model. Shows exactly what was dropped and why.",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
