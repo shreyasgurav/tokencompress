@@ -54,6 +54,16 @@ export interface CompressResult {
   dropped: DroppedItem[]
   /** Ordered list of transform identifiers applied (e.g. `logs:dedup(320->84)`). */
   transformsApplied: string[]
+  /** Additional metrics about the compression (e.g., iterative passes). */
+  metrics?: Record<string, any>
+}
+
+export interface IterativeOptions {
+  enabled?: boolean
+  maxPasses?: number
+  minImprovementPercent?: number
+  minSentenceRetention?: number
+  minSentenceChangePercent?: number
 }
 
 /** Options controlling compression behaviour. */
@@ -64,6 +74,8 @@ export interface CompressOptions {
   targetRatio?: number
   /** Optional hard cap on output tokens (used by text truncation). */
   maxTokens?: number
+  /** Iterative compression settings. */
+  iterative?: IterativeOptions
 }
 
 /** An OpenAI/Anthropic-style chat message. */
@@ -97,6 +109,8 @@ export interface CompressorOutput {
   dropped: DroppedItem[]
   /** Transform identifiers this compressor applied. */
   transforms: string[]
+  /** Additional metrics from this compressor. */
+  metrics?: Record<string, any>
 }
 
 /**
@@ -157,17 +171,33 @@ export interface SegmentedCompressResult {
   transformsApplied: string[]
 }
 
+export interface ResolvedIterativeOptions {
+  enabled: boolean
+  maxPasses: number
+  minImprovementPercent: number
+  minSentenceRetention: number
+  minSentenceChangePercent: number
+}
+
 /** Resolved options with all defaults filled in. */
 export interface ResolvedOptions {
   model: string
   targetRatio: number
   maxTokens: number | undefined
+  iterative: ResolvedIterativeOptions
 }
 
 export const DEFAULT_OPTIONS: ResolvedOptions = {
   model: 'gpt-4o',
   targetRatio: 0.3,
   maxTokens: undefined,
+  iterative: {
+    enabled: true,
+    maxPasses: 3,
+    minImprovementPercent: 5,
+    minSentenceRetention: 0.35,
+    minSentenceChangePercent: 5,
+  },
 }
 
 /** Fill in defaults for any unspecified options. */
@@ -179,5 +209,12 @@ export function resolveOptions(options?: CompressOptions): ResolvedOptions {
         ? Math.min(0.9, Math.max(0.1, options.targetRatio))
         : DEFAULT_OPTIONS.targetRatio,
     maxTokens: options?.maxTokens,
+    iterative: {
+      enabled: options?.iterative?.enabled ?? DEFAULT_OPTIONS.iterative.enabled,
+      maxPasses: options?.iterative?.maxPasses ?? DEFAULT_OPTIONS.iterative.maxPasses,
+      minImprovementPercent: options?.iterative?.minImprovementPercent ?? DEFAULT_OPTIONS.iterative.minImprovementPercent,
+      minSentenceRetention: options?.iterative?.minSentenceRetention ?? DEFAULT_OPTIONS.iterative.minSentenceRetention,
+      minSentenceChangePercent: options?.iterative?.minSentenceChangePercent ?? DEFAULT_OPTIONS.iterative.minSentenceChangePercent,
+    },
   }
 }

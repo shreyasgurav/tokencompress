@@ -26,24 +26,24 @@ import { compressSearch } from './compressors/search-compressor.js'
 import { compressCode } from './compressors/code-compressor.js'
 import { compressHtml } from './compressors/html-compressor.js'
 import { compressText } from './compressors/text-compressor.js'
-import { compressTfidf } from './compressors/tfidf-compressor.js'
+import { compressIterative } from './compressors/iterative-compressor.js'
 
 type CompressorFn = (text: string, opts: ResolvedOptions) => CompressorOutput
 
 /** Below this token saving, TF-IDF isn't worth it — fall back to truncation. */
-const TFIDF_MIN_SAVINGS = 0.2
+const TFIDF_MIN_SAVINGS = 0.05
 
 /**
- * Prose route: TF-IDF extractive compression first, falling back to the
- * legacy whitespace+truncation compressor if TF-IDF saves less than 20% of
+ * Prose route: Iterative extractive compression first, falling back to the
+ * legacy whitespace+truncation compressor if it saves less than 20% of
  * tokens. This never regresses below the old behaviour.
  */
 function compressTextRouted(text: string, opts: ResolvedOptions): CompressorOutput {
   const before = countTokens(text, opts.model)
-  const tfidf = compressTfidf(text, opts)
-  const after = countTokens(tfidf.compressed, opts.model)
+  const iterative = compressIterative(text, opts)
+  const after = countTokens(iterative.compressed, opts.model)
   const savings = before > 0 ? (before - after) / before : 0
-  if (savings >= TFIDF_MIN_SAVINGS) return tfidf
+  if (savings >= TFIDF_MIN_SAVINGS) return iterative
   return compressText(text, opts)
 }
 
@@ -113,6 +113,7 @@ function buildResult(
     confidence,
     dropped: output.dropped,
     transformsApplied: [`detector:${contentType}`, ...output.transforms],
+    metrics: output.metrics,
   }
 }
 

@@ -109,16 +109,10 @@ function contentWords(sentence: string): string[] {
     .filter((w) => w.length > 1 && !STOPWORDS.has(w))
 }
 
-/** Detect whether a sentence carries an importance signal worth preserving. */
 function hasImportanceSignal(text: string): boolean {
   if (/\d/.test(text)) return true // numbers / percentages / versions
   if (/\?/.test(text)) return true // questions are usually important
   if (IMPORTANCE_WORDS.test(text)) return true // decisions / errors / warnings
-  // Named-entity heuristic: a capitalized word that is NOT the first word.
-  const words = text.split(/\s+/)
-  for (let i = 1; i < words.length; i++) {
-    if (/^[A-Z][a-zA-Z]{2,}/.test(words[i])) return true
-  }
   return false
 }
 
@@ -146,7 +140,15 @@ export function compressTfidf(text: string, opts: ResolvedOptions): CompressorOu
 
   // ── Passthrough for short inputs ────────────────────────────────────────
   if (raw.length < MIN_SENTENCES || totalTokens < MIN_TOKENS) {
-    return { compressed: text, dropped: [], transforms: ['tfidf:passthrough'] }
+    return { 
+      compressed: text, 
+      dropped: [], 
+      transforms: ['tfidf:passthrough'],
+      metrics: {
+        originalSentenceCount: raw.length,
+        retainedSentenceCount: raw.length,
+      }
+    }
   }
 
   // ── Stage 2: corpus + document frequencies ──────────────────────────────
@@ -215,7 +217,15 @@ export function compressTfidf(text: string, opts: ResolvedOptions): CompressorOu
 
   // Nothing dropped → report passthrough so the caller can decide to fall back.
   if (droppedCount === 0) {
-    return { compressed: text, dropped: [], transforms: ['tfidf:passthrough'] }
+    return { 
+      compressed: text, 
+      dropped: [], 
+      transforms: ['tfidf:passthrough'],
+      metrics: {
+        originalSentenceCount: N,
+        retainedSentenceCount: N,
+      }
+    }
   }
 
   // ── Stage 5: dropped[] population ───────────────────────────────────────
@@ -239,5 +249,9 @@ export function compressTfidf(text: string, opts: ResolvedOptions): CompressorOu
     compressed,
     dropped,
     transforms: [`tfidf:extractive(${N}sentences->${kept.length}sentences)`],
+    metrics: {
+      originalSentenceCount: N,
+      retainedSentenceCount: kept.length,
+    },
   }
 }
