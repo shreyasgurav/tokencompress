@@ -8,6 +8,7 @@ Every result includes a `dropped[]` report. Nothing is removed silently.
 
 - **Explainable** — `dropped[]` lists every removal with a reason, count, and sample.
 - **Adaptive** — keep-counts are chosen by information-saturation detection, not hardcoded limits, so near-duplicate data collapses hard while diverse data is barely touched.
+- **Prose-aware** — plain text is compressed by TF-IDF extractive summarization: high-signal sentences (numbers, errors, decisions, entities) are always kept while filler is dropped.
 - **Local & dependency-light** — pure TypeScript, no native binaries, no ML model, no API calls.
 - **Fail-open** — if anything goes wrong, you get the original text back, never an error.
 
@@ -142,7 +143,9 @@ route to the matching compressor
   search →  group by file, adaptively cap matches per file, summarize the rest
   code   →  strip block + full-line comments, collapse blank runs
   html   →  drop scripts/styles/markup, keep the readable text
-  text   →  normalize whitespace, truncate middle if still oversized
+  text   →  TF-IDF extractive: score sentences, keep high-signal ones
+            (numbers, errors, decisions), drop filler; falls back to
+            whitespace-normalize + middle-truncate if savings < 20%
   ↓
 count tokens (js-tiktoken)  →  CompressResult with dropped[] populated
 ```
