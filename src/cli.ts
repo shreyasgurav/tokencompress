@@ -12,10 +12,10 @@
 import { readFileSync } from 'node:fs'
 import { Command } from 'commander'
 import { compress } from './compress.js'
-import { detectType } from './detector/content-detector.js'
+import { detectContent } from './detector/content-detector.js'
 import type { CompressResult } from './types.js'
 
-const VERSION = '0.1.0'
+const VERSION = '0.2.0'
 
 function readStdin(): Promise<string> {
   return new Promise((resolve) => {
@@ -48,7 +48,9 @@ function printReport(result: CompressResult): void {
   const line = '─'.repeat(30)
   process.stderr.write(`tokencompress v${VERSION}\n`)
   process.stderr.write(`${line}\n`)
-  process.stderr.write(`Content type:  ${result.contentType}\n`)
+  process.stderr.write(
+    `Content type:  ${result.contentType} (confidence ${(result.confidence * 100).toFixed(0)}%)\n`,
+  )
   process.stderr.write(`Tokens before: ${fmt(result.tokensBefore)}\n`)
   process.stderr.write(`Tokens after:  ${fmt(result.tokensAfter)}\n`)
   process.stderr.write(`Tokens saved:  ${fmt(result.tokensSaved)} (${pct}%)\n\n`)
@@ -104,7 +106,8 @@ program
   .action(async (input, options) => {
     try {
       const text = await resolveInput(input, options.file, options.stdin)
-      process.stdout.write(detectType(text) + '\n')
+      const d = detectContent(text)
+      process.stdout.write(`${d.type} (confidence ${(d.confidence * 100).toFixed(0)}%)\n`)
     } catch (err) {
       process.stderr.write(`Error: ${(err as Error).message}\n`)
       process.exit(1)

@@ -7,6 +7,7 @@
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
 import { sample } from './shared.js'
+import { computeOptimalK } from '../adaptive/sizer.js'
 
 /** filename:linenum:content — first colon-delimited segment is the file. */
 const SEARCH_LINE = /^([^\s:]+):(\d+):(.*)$/
@@ -14,8 +15,12 @@ const SEARCH_LINE = /^([^\s:]+):(\d+):(.*)$/
 export function compressSearch(text: string, opts: ResolvedOptions): CompressorOutput {
   const lines = text.split('\n')
 
-  // Keep max matches per file scaled by targetRatio (10 * (1 - ratio)), floor 3.
+  // Upper bound on matches kept per file, scaled by targetRatio. The adaptive
+  // sizer chooses the actual count per file within this cap based on how much
+  // genuinely new information each match adds.
   const maxPerFile = Math.max(3, Math.floor(10 * Math.max(0.05, 1 - opts.targetRatio)))
+  // Aggressive ratios bias toward keeping fewer; gentle ratios keep more.
+  const bias = 0.7 + (1 - opts.targetRatio) * 0.6
 
   // Preserve insertion order of files.
   const fileOrder: string[] = []
@@ -51,17 +56,23 @@ export function compressSearch(text: string, opts: ResolvedOptions): CompressorO
   for (const file of fileOrder) {
     const matches = perFile.get(file)!
     totalOriginal += matches.length
-    const keep = matches.slice(0, maxPerFile)
+    // Adaptively size the keep-count: near-duplicate matches collapse, while
+    // a file with many distinct matches keeps more (up to maxPerFile).
+    const keepCount =
+      matches.length <= maxPerFile
+        ? matches.length
+        : computeOptimalK(matches, { bias, minK: 3, maxK: maxPerFile })
+    const keep = matches.slice(0, keepCount)
     out.push(...keep)
     totalKept += keep.length
 
-    if (matches.length > maxPerFile) {
-      const omitted = matches.length - maxPerFile
+    if (matches.length > keep.length) {
+      const omitted = matches.length - keep.length
       out.push(`[... ${omitted} more matches in ${file} ...]`)
       dropped.push({
         reason: `additional matches in ${file}`,
         count: omitted,
-        sample: sample(matches[maxPerFile]),
+        sample: sample(matches[keep.length]),
       })
     }
   }

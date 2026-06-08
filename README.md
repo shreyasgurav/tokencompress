@@ -2,9 +2,14 @@
 
 **Explainable LLM context compression — fewer tokens, same information, and a full report of exactly what was dropped and why.**
 
-LLMs charge per token. Logs, JSON dumps, search results, and diffs are full of redundancy you're paying to send. `tokencompress` detects what kind of content you're sending and compresses it with a purpose-built strategy — then tells you precisely what it removed.
+LLMs charge per token. Logs, JSON dumps, search results, diffs, and HTML are full of redundancy you're paying to send. `tokencompress` detects what kind of content you're sending and compresses it with a purpose-built strategy — then tells you precisely what it removed.
 
 Every result includes a `dropped[]` report. Nothing is removed silently.
+
+- **Explainable** — `dropped[]` lists every removal with a reason, count, and sample.
+- **Adaptive** — keep-counts are chosen by information-saturation detection, not hardcoded limits, so near-duplicate data collapses hard while diverse data is barely touched.
+- **Local & dependency-light** — pure TypeScript, no native binaries, no ML model, no API calls.
+- **Fail-open** — if anything goes wrong, you get the original text back, never an error.
 
 ## Install
 
@@ -41,7 +46,13 @@ const compressed = compressMessages(
     { role: 'system', content: 'You are a helpful assistant.' },
     { role: 'user', content: hugeToolOutput },
   ],
-  { model: 'gpt-4o', targetRatio: 0.3 },
+  {
+    model: 'gpt-4o',
+    targetRatio: 0.3,
+    protectRecent: 2,            // leave the last 2 messages (the live turn) untouched
+    compressUserMessages: true,  // default true
+    minTokensToCompress: 200,    // skip messages smaller than this
+  },
 )
 // same array shape, each `content` compressed — drop straight into your API request
 ```
@@ -72,7 +83,8 @@ interface CompressResult {
   tokensAfter: number
   tokensSaved: number
   compressionRatio: number        // 0.0 – 1.0
-  contentType: 'json' | 'logs' | 'diff' | 'search' | 'code' | 'text'
+  contentType: 'json' | 'logs' | 'diff' | 'search' | 'code' | 'html' | 'text'
+  confidence: number              // 0.0 – 1.0 confidence in the detected type
   dropped: DroppedItem[]          // exactly what was removed and why
   transformsApplied: string[]
 }
@@ -89,19 +101,24 @@ interface DroppedItem {
 ```
 input
   ↓
-detectType()  →  json | diff | search | logs | code | text
+detectContent()  →  json | diff | html | search | logs | code | text   (+ confidence)
   ↓
 route to the matching compressor
   ↓
-  json   →  keep head + sampled middle + tail of large arrays
+  json   →  adaptively sample large arrays (head + middle + tail)
   logs   →  keep errors, dedupe repeated lines by normalized template
   diff   →  keep all +/- and headers, cap unchanged context at 3 lines/run
-  search →  group by file, cap matches per file, summarize the rest
+  search →  group by file, adaptively cap matches per file, summarize the rest
   code   →  strip block + full-line comments, collapse blank runs
+  html   →  drop scripts/styles/markup, keep the readable text
   text   →  normalize whitespace, truncate middle if still oversized
   ↓
 count tokens (js-tiktoken)  →  CompressResult with dropped[] populated
 ```
+
+### Adaptive sizing
+
+For JSON arrays and search results, tokencompress doesn't use a fixed keep-count. It builds a cumulative unique-content curve and finds the *knee* — the point where adding more items stops adding information (the Kneedle method, plus SimHash near-duplicate clustering). 500 near-identical rows collapse to a handful; 500 genuinely distinct rows are mostly kept. No ML, just arithmetic.
 
 Everything runs **locally** — no API calls. If a compressor ever throws, it **fails open**: you get the original text back untouched, never an error.
 
@@ -112,6 +129,17 @@ compress(text, {
   model: 'gpt-4o',     // token-counting model (default 'gpt-4o')
   targetRatio: 0.3,    // 0.1 (gentle) – 0.9 (aggressive), default 0.3
   maxTokens: 2000,     // optional hard cap used by text truncation
+})
+```
+
+`compressMessages` accepts the same options plus a message-level policy:
+
+```ts
+compressMessages(messages, {
+  protectRecent: 0,            // leave the last N messages untouched
+  compressUserMessages: true,  // gate compression by role
+  compressSystemMessages: true,
+  minTokensToCompress: 0,      // skip content smaller than this
 })
 ```
 

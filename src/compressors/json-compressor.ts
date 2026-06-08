@@ -11,6 +11,7 @@
  */
 import type { CompressorOutput, ResolvedOptions } from '../types.js'
 import { sample } from './shared.js'
+import { computeOptimalK } from '../adaptive/sizer.js'
 
 const MIN_ARRAY_ITEMS = 5
 
@@ -42,10 +43,19 @@ export function compressJson(text: string, opts: ResolvedOptions): CompressorOut
     }
   }
 
-  // Decide how many items to keep. targetRatio is "fraction removed", so we
-  // keep (1 - targetRatio), with a sensible floor.
+  // targetRatio is "fraction removed"; (1 - targetRatio) is the upper bound on
+  // what we keep. Within that cap, the adaptive sizer decides how many records
+  // are actually distinct enough to keep — a list of 500 near-identical rows
+  // collapses hard, while 500 varied rows are barely touched.
   const keepFraction = Math.max(0.05, 1 - opts.targetRatio)
-  const keepCount = Math.max(MIN_ARRAY_ITEMS, Math.floor(original * keepFraction))
+  const maxKeep = Math.max(MIN_ARRAY_ITEMS, Math.floor(original * keepFraction))
+  const bias = 0.7 + (1 - opts.targetRatio) * 0.6
+  const itemStrings = data.map((item) => JSON.stringify(item))
+  const keepCount = computeOptimalK(itemStrings, {
+    bias,
+    minK: MIN_ARRAY_ITEMS,
+    maxK: maxKeep,
+  })
 
   if (keepCount >= original) {
     return {
