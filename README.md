@@ -36,6 +36,34 @@ console.log(result.dropped)
 // ]
 ```
 
+### Compress a mixed-content document
+
+Real LLM turns aren't one clean type — they interleave prose, code, JSON, and logs in a single message. `segmentAndCompress` splits the document into typed blocks, routes **each block to the compressor that understands it**, and reassembles the document in place. Fenced code blocks keep their fences; nothing is reordered.
+
+```ts
+import { segmentAndCompress } from 'tokencompress'
+
+const result = segmentAndCompress(mixedAssistantMessage)
+
+console.log(result.compressed)   // rebuilt document, each block compressed in place
+console.log(result.tokensSaved)  // total saved across all blocks
+console.log(result.segments)
+// [
+//   { index: 0, kind: 'text',   type: 'text', tokensBefore: 12, tokensSaved: 0 },
+//   { index: 1, kind: 'fenced', type: 'logs', fenceLanguage: 'log', tokensSaved: 410 },
+//   { index: 2, kind: 'fenced', type: 'json', fenceLanguage: 'json', tokensSaved: 380 },
+//   { index: 3, kind: 'fenced', type: 'code', fenceLanguage: 'ts', tokensSaved: 24 },
+// ]
+console.log(result.dropped)      // aggregated drop report across every block
+```
+
+It detects both **fenced** blocks (```` ```json ````, ```` ```ts ````, …) and **unfenced** structures pasted inline — JSON objects/arrays and runs of log lines — leaving the surrounding prose as text. The concatenation of all segments reproduces the input exactly, so if nothing is removed the output is byte-identical.
+
+```bash
+# CLI: compress a mixed document block-by-block
+cat assistant-reply.md | tokencompress segment --stdin
+```
+
 ### Compress a chat-messages array
 
 ```ts
@@ -71,6 +99,9 @@ tokencompress detect --file data.json
 
 # full benchmark report
 tokencompress benchmark large-diff.patch
+
+# compress a mixed document (prose + code + JSON + logs) block-by-block
+tokencompress segment --file assistant-reply.md
 ```
 
 ## The result type
@@ -114,6 +145,18 @@ route to the matching compressor
   text   →  normalize whitespace, truncate middle if still oversized
   ↓
 count tokens (js-tiktoken)  →  CompressResult with dropped[] populated
+```
+
+For documents that mix several types in one message, `segmentAndCompress()` adds a step in front: it segments the input into typed blocks (markdown fences plus unfenced JSON/log runs), runs each block through the pipeline above, and stitches the results back together in order — returning a `SegmentedCompressResult` with a per-segment breakdown.
+
+```
+mixed document
+  ↓
+segment → [ text ][ ```log … ``` ][ text ][ ```json … ``` ][ ```ts … ``` ]
+  ↓           ↓           ↓             ↓          ↓              ↓
+            text       logs          text       json           code     ← each routed independently
+  ↓
+reassemble in place  →  SegmentedCompressResult { compressed, segments[], dropped[] }
 ```
 
 ### Adaptive sizing

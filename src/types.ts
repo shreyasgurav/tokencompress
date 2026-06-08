@@ -99,6 +99,64 @@ export interface CompressorOutput {
   transforms: string[]
 }
 
+/**
+ * How a segment's boundaries were identified by the segmenter.
+ *   - `fenced`: a markdown ```lang fenced block.
+ *   - `json`:   an unfenced JSON object/array embedded in prose.
+ *   - `logs`:   an unfenced run of log lines embedded in prose.
+ *   - `text`:   prose / glue between structured blocks.
+ */
+export type SegmentKind = 'fenced' | 'json' | 'logs' | 'text'
+
+/**
+ * One block of a mixed-content document, after segmentation and compression.
+ * Part of the per-segment explainability breakdown on
+ * {@link SegmentedCompressResult}.
+ */
+export interface SegmentInfo {
+  /** Position of this segment in the original document (0-based). */
+  index: number
+  /** Content type the segment was compressed as. */
+  type: ContentType
+  /** How the segment boundary was identified. */
+  kind: SegmentKind
+  /** Fence language tag, if this came from a ```lang block. */
+  fenceLanguage?: string
+  /** Token count of this segment's content before compression. */
+  tokensBefore: number
+  /** Token count after compression. */
+  tokensAfter: number
+  /** Tokens saved on this segment (never negative). */
+  tokensSaved: number
+  /** What was dropped from this segment and why. */
+  dropped: DroppedItem[]
+}
+
+/**
+ * Result of {@link segmentAndCompress}: a mixed document split into typed
+ * blocks, each routed to its own compressor, then reassembled in order.
+ */
+export interface SegmentedCompressResult {
+  /** The rebuilt document with each block compressed in place. */
+  compressed: string
+  /** The original input, unchanged. */
+  original: string
+  /** Token count of the whole original document. */
+  tokensBefore: number
+  /** Token count of the rebuilt document. */
+  tokensAfter: number
+  /** Total tokens saved across all segments (never negative). */
+  tokensSaved: number
+  /** Fraction of tokens removed, 0.0 to 1.0. */
+  compressionRatio: number
+  /** Per-segment breakdown, in document order. */
+  segments: SegmentInfo[]
+  /** Dropped items aggregated across every segment. */
+  dropped: DroppedItem[]
+  /** Ordered transform identifiers applied across the document. */
+  transformsApplied: string[]
+}
+
 /** Resolved options with all defaults filled in. */
 export interface ResolvedOptions {
   model: string

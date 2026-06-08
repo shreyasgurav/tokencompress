@@ -39,6 +39,38 @@ const COMPRESSORS: Record<ContentType, CompressorFn> = {
   text: compressText,
 }
 
+/**
+ * Run a specific compressor, bypassing detection, and build a full result.
+ * Used by the segmenter (which already decided each segment's type). Fails
+ * open: a throwing compressor yields the original text with empty `dropped`.
+ */
+export function compressAs(
+  text: string,
+  contentType: ContentType,
+  confidence: number,
+  options?: CompressOptions,
+): CompressResult {
+  const opts = resolveOptions(options)
+  try {
+    const output = COMPRESSORS[contentType](text, opts)
+    return buildResult(text, contentType, confidence, output, opts)
+  } catch {
+    const tokens = countTokens(text, opts.model)
+    return {
+      compressed: text,
+      original: text,
+      tokensBefore: tokens,
+      tokensAfter: tokens,
+      tokensSaved: 0,
+      compressionRatio: 0,
+      contentType,
+      confidence,
+      dropped: [],
+      transformsApplied: [`detector:${contentType}`, 'error:passthrough'],
+    }
+  }
+}
+
 function buildResult(
   original: string,
   contentType: ContentType,
@@ -91,28 +123,7 @@ export function compress(text: string, options?: CompressOptions): CompressResul
   }
 
   const detection = detectContent(text)
-  const contentType = detection.type
-  const compressor = COMPRESSORS[contentType]
-
-  try {
-    const output = compressor(text, opts)
-    return buildResult(text, contentType, detection.confidence, output, opts)
-  } catch {
-    // Fail open: never break the caller. Return original untouched.
-    const tokens = countTokens(text, opts.model)
-    return {
-      compressed: text,
-      original: text,
-      tokensBefore: tokens,
-      tokensAfter: tokens,
-      tokensSaved: 0,
-      compressionRatio: 0,
-      contentType,
-      confidence: detection.confidence,
-      dropped: [],
-      transformsApplied: [`detector:${contentType}`, 'error:passthrough'],
-    }
-  }
+  return compressAs(text, detection.type, detection.confidence, opts)
 }
 
 /**
