@@ -4,7 +4,7 @@
 
 LLMs charge per token. Logs, JSON dumps, search results, and diffs are full of redundancy you're paying to send. `tokencompress` detects what kind of content you're sending and compresses it with a purpose-built strategy — then tells you precisely what it removed.
 
-Unlike other context compressors, **every result includes a `dropped[]` report**. Nothing is removed silently.
+Every result includes a `dropped[]` report. Nothing is removed silently.
 
 ## Install
 
@@ -104,18 +104,6 @@ count tokens (js-tiktoken)  →  CompressResult with dropped[] populated
 ```
 
 Everything runs **locally** — no API calls. If a compressor ever throws, it **fails open**: you get the original text back untouched, never an error.
-
-## Why tokencompress vs the alternatives
-
-| | tokencompress | Headroom | The Token Company |
-|---|:---:|:---:|:---:|
-| Open source | ✅ | ✅ | SDK only |
-| Runs locally, no API | ✅ | ✅ | ❌ (hosted) |
-| Rule-based (predictable) | ✅ | ✅ (+1 ML model) | ❌ (ML model) |
-| **Explains what it dropped** | ✅ | ❌ | ❌ |
-| Language | TypeScript | Python + Rust | Python / Node SDK |
-
-The differentiator is **explainability**. Developers trust a compressor they can audit — `dropped[]` shows every removal with a reason, a count, and a sample.
 
 ## Options
 
