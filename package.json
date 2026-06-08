@@ -26,6 +26,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "validate": "vitest run tests/validation/",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
