@@ -1,6 +1,6 @@
 {
   "name": "tokencompress",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Explainable LLM context compression — fewer tokens, same information, and a full report of exactly what was dropped and why.",
   "type": "module",
   "main": "dist/index.js",
