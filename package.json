@@ -1,6 +1,6 @@
 {
   "name": "tokencompress",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Removes redundant tokens from LLM inputs before they hit the model. Shows exactly what was dropped and why.",
   "type": "module",
   "main": "dist/index.js",
@@ -27,6 +27,9 @@
     "test:watch": "vitest",
     "lint": "tsc -p tsconfig.json --noEmit",
     "validate": "vitest run tests/validation/",
+    "benchmark": "npx tsx benchmarks/squad.ts",
+    "benchmark:quick": "npx tsx benchmarks/squad.ts --limit 20",
+    "benchmark:long": "npx tsx benchmarks/longdoc.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -51,6 +54,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "node-fetch": "^3.3.2",
+    "tsx": "^4.22.4",
     "typescript": "^5.6.3",
     "vitest": "^2.1.5"
   }

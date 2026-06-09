@@ -12,6 +12,15 @@ Every result includes a `dropped[]` report. Nothing is removed silently.
 - **Local & dependency-light** — pure TypeScript, no native binaries, no ML model, no API calls.
 - **Fail-open** — if anything goes wrong, you get the original text back, never an error.
 
+## Benchmarks
+
+**Conversational Documents (Chat Histories)**
+- `ChatGPT-Building future.md` — 41.2% reduction, 100% retention
+- `ChatGPT-DSA.md` — 32.2% reduction, 94.1% retention
+
+**Structured Prose**
+- `SQuAD v2` (150 questions) — 19.3% reduction, 88.8% retention
+
 ## Install
 
 ```bash

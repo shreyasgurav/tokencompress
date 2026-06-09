@@ -91,7 +91,36 @@ export function detectContent(text: string): DetectionResult {
 
   const lines = trimmed.split('\n')
 
-  // 4. Search results — >30% of the first 30 lines look like file:line: matches.
+  // 4. Conversation — >30% match speaker pattern and >= 3 speakers, OR strong speaker in first 50 lines.
+  // Matches: "Name:", "**Name**:", "**Name**", "## Name:"
+  const SPEAKER_PATTERN = /^(?:\*\*([A-Z][a-zA-Z]+)\*\*(?::\s|\s*$)|([A-Z][a-zA-Z]+):\s|##\s*([A-Z][a-zA-Z]+):(?:\s|$))/i
+  const STRONG_SPEAKER_PATTERN = /^(?:\*\*?)?(User|You|Human|Assistant|ChatGPT|Claude|AI)(?:\*\*?)?(?::\s|\s*$)|##\s*(Prompt|Response|User|Assistant|AI):(?:\s|$)/i
+  const first50 = lines.slice(0, 50)
+  
+  const speakers = new Set<string>()
+  let speakerHits = 0
+  let hasStrongSpeaker = false
+
+  for (const l of first50) {
+    const trimmedLine = l.trim()
+    const m = trimmedLine.match(SPEAKER_PATTERN)
+    if (m) {
+      speakerHits++
+      // The name is in group 1, 2, or 3
+      speakers.add((m[1] || m[2] || m[3]).toLowerCase())
+    }
+    if (STRONG_SPEAKER_PATTERN.test(trimmedLine)) {
+      hasStrongSpeaker = true
+    }
+  }
+
+  const speakerFrac = first50.length > 0 ? speakerHits / first50.length : 0
+  if ((speakerFrac > 0.3 && speakers.size >= 3) || hasStrongSpeaker) {
+    const confidence = (speakerFrac > 0.3 && speakers.size >= 3) ? 0.85 : 0.65
+    return { type: 'conversation', confidence, metadata: { speakers: Array.from(speakers) } }
+  }
+
+  // 5. Search results — >30% of the first 30 lines look like file:line: matches.
   const first30 = lines.slice(0, 30)
   const searchFrac = fractionMatching(first30, (l) => SEARCH_LINE.test(l.trim()))
   if (searchFrac > 0.3) {
@@ -99,7 +128,6 @@ export function detectContent(text: string): DetectionResult {
   }
 
   // 5. Logs — >30% of the first 50 lines carry a log level or timestamp.
-  const first50 = lines.slice(0, 50)
   const logFrac = fractionMatching(first50, (l) => LOG_PATTERN.test(l))
   if (logFrac > 0.3) {
     return { type: 'logs', confidence: Math.min(1, 0.4 + logFrac * 0.6), metadata: {} }

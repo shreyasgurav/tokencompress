@@ -7,7 +7,7 @@
  */
 
 /** The content categories tokencompress knows how to compress. */
-export type ContentType = 'json' | 'logs' | 'diff' | 'search' | 'code' | 'html' | 'text'
+export type ContentType = 'json' | 'logs' | 'diff' | 'search' | 'code' | 'html' | 'text' | 'conversation'
 
 /** Outcome of content-type detection, with a confidence score and metadata. */
 export interface DetectionResult {

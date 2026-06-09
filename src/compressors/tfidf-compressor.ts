@@ -20,9 +20,9 @@ import { countTokens } from '../tokens/counter.js'
 import { sample } from './shared.js'
 
 /** Below this many sentences, prose is too short to compress meaningfully. */
-const MIN_SENTENCES = 5
+const MIN_SENTENCES = 6
 /** Below this many tokens, the input isn't worth extractive compression. */
-const MIN_TOKENS = 200
+const MIN_TOKENS = 80
 /** Multiplier applied to sentences carrying an importance signal. */
 const BOOST = 1.4
 /** Fraction of top-scoring sentences always kept regardless of budget. */
@@ -198,7 +198,9 @@ export function compressTfidf(text: string, opts: ResolvedOptions): CompressorOu
   keepSet.add(sentences[0].index)
   keepSet.add(sentences[N - 1].index)
   for (let i = 0; i < topKeepCount; i++) keepSet.add(byScore[i].index)
-  for (const s of sentences) if (s.boosted) keepSet.add(s.index)
+  for (const s of sentences) {
+    if (s.boosted) keepSet.add(s.index)
+  }
 
   // Greedily add highest-scoring sentences until the budget is reached.
   let keptTokens = 0

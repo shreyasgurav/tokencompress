@@ -25,6 +25,7 @@ import { compressDiff } from './compressors/diff-compressor.js'
 import { compressSearch } from './compressors/search-compressor.js'
 import { compressCode } from './compressors/code-compressor.js'
 import { compressHtml } from './compressors/html-compressor.js'
+import { compressConversation } from './compressors/conversation-compressor.js'
 import { compressText } from './compressors/text-compressor.js'
 import { compressIterative } from './compressors/iterative-compressor.js'
 
@@ -54,6 +55,7 @@ const COMPRESSORS: Record<ContentType, CompressorFn> = {
   search: compressSearch,
   code: compressCode,
   html: compressHtml,
+  conversation: compressConversation,
   text: compressTextRouted,
 }
 
@@ -142,6 +144,7 @@ export function compress(text: string, options?: CompressOptions): CompressResul
   }
 
   const detection = detectContent(text)
+  console.log('Detected type:', detection.type, 'confidence:', detection.confidence)
   return compressAs(text, detection.type, detection.confidence, opts)
 }
 
