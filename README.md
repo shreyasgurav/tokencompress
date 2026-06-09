@@ -14,9 +14,11 @@ Every result includes a `dropped[]` report. Nothing is removed silently.
 
 ## Benchmarks
 
-**Conversational Documents (Chat Histories)**
+**Conversational Documents (Turn-Aware Compression)**
+Unlike standard naive TF-IDF which destroys the structural thread of chat histories, our Turn-Aware Conversational Compression protects the back-and-forth structure while internally crushing verbose assistant responses.
 - `ChatGPT-Building future.md` — 41.2% reduction, 100% retention
 - `ChatGPT-DSA.md` — 32.2% reduction, 94.1% retention
+- `ChatGPT-Fitness.md` — 29.6% reduction, 92.9% retention
 
 **Structured Prose**
 - `SQuAD v2` (150 questions) — 19.3% reduction, 88.8% retention
@@ -146,15 +148,17 @@ detectContent()  →  json | diff | html | search | logs | code | text   (+ conf
   ↓
 route to the matching compressor
   ↓
-  json   →  adaptively sample large arrays (head + middle + tail)
-  logs   →  keep errors, dedupe repeated lines by normalized template
-  diff   →  keep all +/- and headers, cap unchanged context at 3 lines/run
-  search →  group by file, adaptively cap matches per file, summarize the rest
-  code   →  strip block + full-line comments, collapse blank runs
-  html   →  drop scripts/styles/markup, keep the readable text
-  text   →  TF-IDF extractive: score sentences, keep high-signal ones
-            (numbers, errors, decisions), drop filler; falls back to
-            whitespace-normalize + middle-truncate if savings < 20%
+  json         →  adaptively sample large arrays (head + middle + tail)
+  logs         →  keep errors, dedupe repeated lines by normalized template
+  diff         →  keep all +/- and headers, cap unchanged context at 3 lines/run
+  search       →  group by file, adaptively cap matches per file, summarize the rest
+  code         →  strip block + full-line comments, collapse blank runs
+  html         →  drop scripts/styles/markup, keep the readable text
+  conversation →  turn-aware splitting: protects all user turns and structural boundaries, 
+                  only compresses long assistant responses internally using TF-IDF
+  text         →  TF-IDF extractive: score sentences, keep high-signal ones
+                  (numbers, errors, decisions), drop filler; falls back to
+                  whitespace-normalize + middle-truncate if savings < 20%
   ↓
 count tokens (js-tiktoken)  →  CompressResult with dropped[] populated
 ```
