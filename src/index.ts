@@ -3,7 +3,14 @@
  *
  * Public API surface. Keep this small and stable.
  */
-export { compress, compressMessages, compressAs } from './compress.js'
+export {
+  compress,
+  compressAsync,
+  compressAs,
+  compressAsAsync,
+  compressMessages,
+  compressMessagesAsync,
+} from './compress.js'
 export { segmentAndCompress } from './segment/segment-compress.js'
 export { segmentDocument } from './segment/segmenter.js'
 export { detectType, detectContent } from './detector/content-detector.js'

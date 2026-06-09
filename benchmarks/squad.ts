@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { compress } from '../src/index.js'
+import { compressAsync } from '../src/index.js'
 import { isCorrect } from './evaluate.js'
 import { generateReport, QuestionResult } from './report.js'
 import { fileURLToPath } from 'url'
@@ -151,7 +151,7 @@ async function runBenchmark() {
       let compFailed = false
       
       try {
-        cRes = compress(q.passage, { targetRatio: 0.5 })
+        cRes = await compressAsync(q.passage, { targetRatio: 0.5 })
         compressedPassage = cRes.compressed
       } catch (err) {
         console.warn(`\nCompression failed for Q${index}, using original.`)

@@ -28,8 +28,10 @@ import { compressHtml } from './compressors/html-compressor.js'
 import { compressConversation } from './compressors/conversation-compressor.js'
 import { compressText } from './compressors/text-compressor.js'
 import { compressIterative } from './compressors/iterative-compressor.js'
+import { compressML } from './compressors/ml-compressor.js'
 
 type CompressorFn = (text: string, opts: ResolvedOptions) => CompressorOutput
+type AsyncCompressorFn = (text: string, opts: ResolvedOptions) => Promise<CompressorOutput>
 
 /** Below this token saving, TF-IDF isn't worth it — fall back to truncation. */
 const TFIDF_MIN_SAVINGS = 0.05
@@ -60,6 +62,20 @@ const COMPRESSORS: Record<ContentType, CompressorFn> = {
 }
 
 /**
+ * Async compressor map that uses the ML model for text/conversation
+ */
+const ASYNC_COMPRESSORS: Record<ContentType, AsyncCompressorFn> = {
+  json: async (text, opts) => compressJson(text, opts),
+  logs: async (text, opts) => compressLogs(text, opts),
+  diff: async (text, opts) => compressDiff(text, opts),
+  search: async (text, opts) => compressSearch(text, opts),
+  code: async (text, opts) => compressCode(text, opts),
+  html: async (text, opts) => compressHtml(text, opts),
+  conversation: async (text, opts) => compressML(text, opts),
+  text: async (text, opts) => compressML(text, opts),
+}
+
+/**
  * Run a specific compressor, bypassing detection, and build a full result.
  * Used by the segmenter (which already decided each segment's type). Fails
  * open: a throwing compressor yields the original text with empty `dropped`.
@@ -75,19 +91,44 @@ export function compressAs(
     const output = COMPRESSORS[contentType](text, opts)
     return buildResult(text, contentType, confidence, output, opts)
   } catch {
-    const tokens = countTokens(text, opts.model)
-    return {
-      compressed: text,
-      original: text,
-      tokensBefore: tokens,
-      tokensAfter: tokens,
-      tokensSaved: 0,
-      compressionRatio: 0,
-      contentType,
-      confidence,
-      dropped: [],
-      transformsApplied: [`detector:${contentType}`, 'error:passthrough'],
-    }
+    return failOpenResult(text, contentType, confidence, opts)
+  }
+}
+
+export async function compressAsAsync(
+  text: string,
+  contentType: ContentType,
+  confidence: number,
+  options?: CompressOptions,
+): Promise<CompressResult> {
+  const opts = resolveOptions(options)
+  try {
+    const output = await ASYNC_COMPRESSORS[contentType](text, opts)
+    return buildResult(text, contentType, confidence, output, opts)
+  } catch (err) {
+    console.error(`Async compression failed for ${contentType}:`, err)
+    return failOpenResult(text, contentType, confidence, opts)
+  }
+}
+
+function failOpenResult(
+  text: string,
+  contentType: ContentType,
+  confidence: number,
+  opts: ResolvedOptions,
+): CompressResult {
+  const tokens = countTokens(text, opts.model)
+  return {
+    compressed: text,
+    original: text,
+    tokensBefore: tokens,
+    tokensAfter: tokens,
+    tokensSaved: 0,
+    compressionRatio: 0,
+    contentType,
+    confidence,
+    dropped: [],
+    transformsApplied: [`detector:${contentType}`, 'error:passthrough'],
   }
 }
 
@@ -129,36 +170,29 @@ export function compress(text: string, options?: CompressOptions): CompressResul
   const opts = resolveOptions(options)
 
   if (!text || text.trim().length === 0) {
-    return {
-      compressed: text,
-      original: text,
-      tokensBefore: 0,
-      tokensAfter: 0,
-      tokensSaved: 0,
-      compressionRatio: 0,
-      contentType: 'text',
-      confidence: 0,
-      dropped: [],
-      transformsApplied: ['detector:text', 'text:passthrough'],
-    }
+    return failOpenResult(text, 'text', 0, opts)
   }
 
   const detection = detectContent(text)
-  console.log('Detected type:', detection.type, 'confidence:', detection.confidence)
   return compressAs(text, detection.type, detection.confidence, opts)
 }
 
 /**
- * Compress each message's content in a chat-messages array, preserving the
- * array structure and roles. Useful for piping straight into an OpenAI /
- * Anthropic request body.
- *
- * A message-level policy controls what gets touched:
- *   - `protectRecent` leaves the last N messages alone (the active turn).
- *   - `compressUserMessages` / `compressSystemMessages` gate by role.
- *   - `minTokensToCompress` skips content too small to be worth it.
- *
- * Defaults compress every message, preserving the previous behaviour.
+ * Compress a raw string asynchronously using the ML model.
+ */
+export async function compressAsync(text: string, options?: CompressOptions): Promise<CompressResult> {
+  const opts = resolveOptions(options)
+
+  if (!text || text.trim().length === 0) {
+    return failOpenResult(text, 'text', 0, opts)
+  }
+
+  const detection = detectContent(text)
+  return compressAsAsync(text, detection.type, detection.confidence, opts)
+}
+
+/**
+ * Compress each message's content in a chat-messages array.
  */
 export function compressMessages(
   messages: Message[],
@@ -184,4 +218,38 @@ export function compressMessages(
     }
     return { ...msg, content: compress(msg.content, options).compressed }
   })
+}
+
+/**
+ * Compress each message's content asynchronously using the ML model.
+ */
+export async function compressMessagesAsync(
+  messages: Message[],
+  options?: MessageCompressOptions,
+): Promise<Message[]> {
+  const protectRecent = Math.max(0, options?.protectRecent ?? 0)
+  const compressUser = options?.compressUserMessages ?? true
+  const compressSystem = options?.compressSystemMessages ?? true
+  const minTokens = Math.max(0, options?.minTokensToCompress ?? 0)
+  const model = options?.model ?? 'gpt-4o'
+
+  const protectedFrom = messages.length - protectRecent
+
+  const results = []
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    const isProtectedByPosition = i >= protectedFrom
+    const roleAllowed =
+      (msg.role !== 'user' || compressUser) &&
+      (msg.role !== 'system' || compressSystem)
+    const bigEnough = minTokens === 0 || countTokens(msg.content, model) >= minTokens
+
+    if (isProtectedByPosition || !roleAllowed || !bigEnough) {
+      results.push({ ...msg })
+    } else {
+      const res = await compressAsync(msg.content, options)
+      results.push({ ...msg, content: res.compressed })
+    }
+  }
+  return results
 }

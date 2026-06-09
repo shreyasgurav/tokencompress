@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
-import { compress } from '../src/index.js'
+import { compressAsync } from '../src/index.js'
 import { isCorrect } from './evaluate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -160,8 +160,8 @@ async function runLongDocBenchmark() {
   // Use first 50,000 chars which is roughly 12,000 tokens.
   const passage = rawContent.slice(0, 50000)
 
-  console.log(`Compressing document...`)
-  const cRes = compress(passage, { targetRatio: 0.5 })
+  console.log(`Compressing document using ML Model...`)
+  const cRes = await compressAsync(passage, { targetRatio: 0.5 })
   const compressedPassage = cRes.compressed
 
   console.log(`Original: ${cRes.tokensBefore} tokens`)
