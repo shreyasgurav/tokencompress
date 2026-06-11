@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
 import { countTokens } from '../tokens/counter.js'
 import { sample } from './shared.js'
+import { contentWords, hasImportanceSignal } from './tfidf-compressor.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -86,7 +87,7 @@ function splitSentences(input: string): Array<Pick<Sentence, 'index' | 'text' | 
   return out
 }
 
-function reassemble(kept: Sentence[]): string {
+function reassemble(kept: Array<Pick<Sentence, 'index' | 'text' | 'trailing'>>): string {
   let result = ''
   for (let i = 0; i < kept.length; i++) {
     result += kept[i].text
@@ -114,62 +115,115 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
     }
   }
 
-  const classifier = await getPipeline()
-  const sentences: Sentence[] = []
+  const N = raw.length
 
-  const batchSize = 1
-  for (let i = 0; i < raw.length; i += batchSize) {
-    const chunk = raw.slice(i, i + batchSize)
-    const inputStrings = chunk.map((s, chunkIdx) => {
-      const globalIdx = i + chunkIdx
-      const prev = globalIdx > 0 ? raw[globalIdx - 1].text : ''
-      const next = globalIdx < raw.length - 1 ? raw[globalIdx + 1].text : ''
-      const context = `${prev} ${s.text} ${next}`.trim()
-      return `[SENTENCE] ${s.text} [CONTEXT] ${context}`.slice(0, 1500)
-    })
+  // Pre-filter with TF-IDF heuristics
+  const df = new Map<string, number>()
+  const perSentenceWords: string[][] = raw.map((s) => contentWords(s.text))
+  for (const words of perSentenceWords) {
+    for (const w of new Set(words)) df.set(w, (df.get(w) ?? 0) + 1)
+  }
 
-    const outputs = await classifier(inputStrings)
-    const outputsArray = Array.isArray(outputs) ? outputs : [outputs]
-
-    for (let chunkIdx = 0; chunkIdx < chunk.length; chunkIdx++) {
-      const s = chunk[chunkIdx]
-      const output = outputsArray[chunkIdx]
-      let prob = 0
-      if (output.label === 'LABEL_1') {
-        prob = output.score
-      } else {
-        prob = 1.0 - output.score // LABEL_0 is filler
+  const tfidfScores = raw.map((_s, i) => {
+    const words = perSentenceWords[i]
+    let score = 0
+    if (words.length > 0) {
+      const tf = new Map<string, number>()
+      for (const w of words) tf.set(w, (tf.get(w) ?? 0) + 1)
+      let sum = 0
+      for (const [w, count] of tf) {
+        const termFreq = count / words.length
+        const idf = Math.log(N / (df.get(w) ?? 1))
+        sum += termFreq * idf * count
       }
+      score = sum / words.length
+    }
+    return score
+  })
 
-      sentences.push({
-        ...s,
-        tokens: 0,
-        score: prob,
+  // Determine thresholds for Auto-Keep and Auto-Drop
+  const sortedScores = [...tfidfScores].sort((a, b) => a - b)
+  const p30 = sortedScores[Math.floor(N * 0.3)] || 0
+  const p90 = sortedScores[Math.floor(N * 0.9)] || 0
+
+  const autoKeep = new Set<number>()
+  const autoDrop = new Set<number>()
+  const ambiguous: typeof raw = []
+
+  for (let i = 0; i < N; i++) {
+    const s = raw[i]
+    const score = tfidfScores[i]
+    const hasSignal = hasImportanceSignal(s.text)
+    
+    const text = s.text.trim();
+    // Preserve speaker tags for all major AI models
+    const isSpeakerTag = 
+      // Standard text-based roles (OpenAI, Anthropic, Gemini, generic)
+      /^(User|ChatGPT|Assistant|System|Human|AI|Model)\s*:/i.test(text) || 
+      /^\*\*(User|ChatGPT|Assistant|System|Human|AI|Model)\*\*\s*:/i.test(text) ||
+      // Llama 2 tags
+      /\[\/?INST\]/i.test(text) || 
+      /<<\/?SYS>>/i.test(text) ||
+      // Llama 3 headers
+      /<\|start_header_id\|>.*?<\|end_header_id\|>/.test(text) ||
+      /<\|eot_id\|>/.test(text) ||
+      // XML-like structural tags (often used by Claude) at start of sentence
+      /^<\/?(instructions|context|example|input|output|system)>/i.test(text) ||
+      // Markdown headers
+      /^#+\s/.test(text);
+
+    if (i === 0 || i === N - 1 || isSpeakerTag) {
+      autoKeep.add(s.index)
+    } else if (score >= p90) {
+      autoKeep.add(s.index)
+    } else if (score <= p30 && !hasSignal && s.text.length < 120) {
+      autoDrop.add(s.index)
+    } else {
+      ambiguous.push(s)
+    }
+  }
+
+  // Only run ML model on ambiguous sentences
+  const mlKeepSet = new Set<number>()
+  
+  if (ambiguous.length > 0) {
+    const classifier = await getPipeline()
+    const batchSize = 1
+    const threshold = 1.0 - opts.targetRatio
+    
+    for (let i = 0; i < ambiguous.length; i += batchSize) {
+      const chunk = ambiguous.slice(i, i + batchSize)
+      const inputStrings = chunk.map((s) => {
+        const globalIdx = raw.findIndex((rs) => rs.index === s.index)
+        const prev = globalIdx > 0 ? raw[globalIdx - 1].text : ''
+        const next = globalIdx < raw.length - 1 ? raw[globalIdx + 1].text : ''
+        const context = `${prev} ${s.text} ${next}`.trim()
+        return `[SENTENCE] ${s.text} [CONTEXT] ${context}`.slice(0, 1500)
       })
+
+      const outputs = await classifier(inputStrings)
+      const outputsArray = Array.isArray(outputs) ? outputs : [outputs]
+
+      for (let chunkIdx = 0; chunkIdx < chunk.length; chunkIdx++) {
+        const s = chunk[chunkIdx]
+        const output = outputsArray[chunkIdx]
+        let prob = 0
+        if (output.label === 'LABEL_1') {
+          prob = output.score
+        } else {
+          prob = 1.0 - output.score
+        }
+        
+        if (prob >= threshold) {
+          mlKeepSet.add(s.index)
+        }
+      }
     }
   }
 
-  // Instead of a strict token budget (which forces dropping important content if the document is dense),
-  // we use the targetRatio as a confidence threshold. A 50% target ratio means we keep prob >= 0.5.
-  const threshold = 1.0 - opts.targetRatio
-
-  const byScore = [...sentences].sort((a, b) => b.score - a.score)
-  const topKeepCount = Math.max(1, Math.floor(sentences.length * 0.1)) // Top 10% always kept
-
-  const keepSet = new Set<number>()
-  keepSet.add(sentences[0].index)
-  keepSet.add(sentences[sentences.length - 1].index)
-  for (let i = 0; i < topKeepCount; i++) keepSet.add(byScore[i].index)
-
-  // Keep any sentence that the ML model predicted as important
-  for (const s of sentences) {
-    if (s.score >= threshold) {
-      keepSet.add(s.index)
-    }
-  }
-
-  const kept = sentences.filter((s) => keepSet.has(s.index)).sort((a, b) => a.index - b.index)
-  const droppedSentences = sentences.filter((s) => !keepSet.has(s.index))
+  const finalKeepSet = new Set<number>([...autoKeep, ...mlKeepSet])
+  const kept = raw.filter((s) => finalKeepSet.has(s.index))
+  const droppedSentences = raw.filter((s) => !finalKeepSet.has(s.index))
   const droppedCount = droppedSentences.length
 
   if (droppedCount === 0) {

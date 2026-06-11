@@ -101,7 +101,7 @@ function splitSentences(input: string): Array<Pick<Sentence, 'index' | 'text' | 
 }
 
 /** Tokenize into lowercase content words, stripping punctuation and stopwords. */
-function contentWords(sentence: string): string[] {
+export function contentWords(sentence: string): string[] {
   return sentence
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
@@ -109,7 +109,7 @@ function contentWords(sentence: string): string[] {
     .filter((w) => w.length > 1 && !STOPWORDS.has(w))
 }
 
-function hasImportanceSignal(text: string): boolean {
+export function hasImportanceSignal(text: string): boolean {
   if (/\d/.test(text)) return true // numbers / percentages / versions
   if (/\?/.test(text)) return true // questions are usually important
   if (IMPORTANCE_WORDS.test(text)) return true // decisions / errors / warnings

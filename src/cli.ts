@@ -12,7 +12,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { Command } from 'commander'
-import { compress } from './compress.js'
+import { compress, compressAsync } from './compress.js'
 import { segmentAndCompress } from './segment/segment-compress.js'
 import { detectContent } from './detector/content-detector.js'
 import type { CompressResult, SegmentedCompressResult } from './types.js'
@@ -116,10 +116,12 @@ program
   .option('-m, --model <model>', 'model for token counting', 'gpt-4o')
   .option('-r, --ratio <ratio>', 'target compression ratio 0.1-0.9', parseFloat)
   .option('--quiet', 'suppress the stats report (only print compressed output)')
+  .option('--ml', 'use the asynchronous machine-learning compressor')
   .action(async (input, options) => {
     try {
       const text = await resolveInput(input, options.file, options.stdin)
-      const result = compress(text, { model: options.model, targetRatio: options.ratio })
+      const opts = { model: options.model, targetRatio: options.ratio }
+      const result = options.ml ? await compressAsync(text, opts) : compress(text, opts)
       if (!options.quiet) printReport(result)
       process.stdout.write(result.compressed + '\n')
     } catch (err) {
@@ -151,10 +153,12 @@ program
   .argument('<file>', 'file to benchmark')
   .option('-m, --model <model>', 'model for token counting', 'gpt-4o')
   .option('-r, --ratio <ratio>', 'target compression ratio 0.1-0.9', parseFloat)
-  .action((file, options) => {
+  .option('--ml', 'use the asynchronous machine-learning compressor')
+  .action(async (file, options) => {
     try {
       const text = readFileSync(file, 'utf8')
-      const result = compress(text, { model: options.model, targetRatio: options.ratio })
+      const opts = { model: options.model, targetRatio: options.ratio }
+      const result = options.ml ? await compressAsync(text, opts) : compress(text, opts)
       printReport(result)
     } catch (err) {
       process.stderr.write(`Error: ${(err as Error).message}\n`)
