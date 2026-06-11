@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 import { compressAsync } from '../src/index.js'
-import { isCorrect } from './evaluate.js'
+import { isCorrectLLM } from './evaluate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -172,6 +172,11 @@ async function runLongDocBenchmark() {
   let compressedCorrectCount = 0
   let skippedDueToError = 0
 
+  let mdReport = `# LongDoc Benchmark LLM Evaluation Report\n\n`
+  mdReport += `**Original Tokens:** ${cRes.tokensBefore}\n`
+  mdReport += `**Compressed Tokens:** ${cRes.tokensAfter} (${(cRes.compressionRatio * 100).toFixed(1)}% reduction)\n\n`
+  mdReport += `## Detailed Results\n\n`
+
   for (let i = 0; i < QUESTIONS.length; i++) {
     const q = QUESTIONS[i]
     process.stdout.write(`\r[${i+1}/${QUESTIONS.length}] Evaluating...`)
@@ -193,14 +198,25 @@ async function runLongDocBenchmark() {
       continue
     }
 
-    const controlCorrect = isCorrect(controlAnswer, q.a)
-    const compressedCorrect = isCorrect(compressedAnswer, q.a)
+    const controlCorrect = await isCorrectLLM(q.q, q.a, controlAnswer)
+    const compressedCorrect = await isCorrectLLM(q.q, q.a, compressedAnswer)
 
     if (controlCorrect) controlCorrectCount++
     if (compressedCorrect) compressedCorrectCount++
+
+    // Log for the report
+    mdReport += `### Question ${i + 1}\n**Q:** ${q.q}\n\n`
+    mdReport += `**Expected:** ${q.a.join(' OR ')}\n\n`
+    mdReport += `**Control Answer:** ${controlAnswer} \`[${controlCorrect ? 'PASS' : 'FAIL'}]\`\n\n`
+    mdReport += `**Compressed Answer:** ${compressedAnswer} \`[${compressedCorrect ? 'PASS' : 'FAIL'}]\`\n\n`
+    mdReport += `---\n\n`
   }
 
   const validQuestions = QUESTIONS.length - skippedDueToError
+
+  const controlScore = ((controlCorrectCount / validQuestions) * 100).toFixed(1)
+  const compressedScore = ((compressedCorrectCount / validQuestions) * 100).toFixed(1)
+  const retention = controlCorrectCount > 0 ? ((compressedCorrectCount / controlCorrectCount) * 100).toFixed(1) : "0"
 
   console.log(`\n\ntokencompress benchmark — Long Document (Chat History)`)
   console.log(`════════════════════════════════════════════════════════`)
@@ -211,13 +227,26 @@ async function runLongDocBenchmark() {
   console.log(`\nQuestions skipped due to API errors: ${skippedDueToError}`)
   
   if (validQuestions > 0) {
-    console.log(`\nControl Score:     ${controlCorrectCount} / ${validQuestions} (${((controlCorrectCount/validQuestions)*100).toFixed(1)}%)`)
-    console.log(`Compressed Score:  ${compressedCorrectCount} / ${validQuestions} (${((compressedCorrectCount/validQuestions)*100).toFixed(1)}%)`)
-    const retention = controlCorrectCount > 0 ? (compressedCorrectCount / controlCorrectCount) * 100 : 0
-    console.log(`Retention Rate:    ${retention.toFixed(1)}%`)
+    console.log(`\nControl Score:     ${controlCorrectCount} / ${validQuestions} (${controlScore}%)`)
+    console.log(`Compressed Score:  ${compressedCorrectCount} / ${validQuestions} (${compressedScore}%)`)
+    console.log(`Retention Rate:    ${retention}%`)
+
+    mdReport += `## Summary\n\n`
+    mdReport += `- **Control Score:** ${controlScore}%\n`
+    mdReport += `- **Compressed Score:** ${compressedScore}%\n`
+    mdReport += `- **Retention:** ${retention}%\n`
   } else {
     console.log(`\nNo valid questions answered due to errors.`)
   }
+  console.log(`════════════════════════════════════════════════════════\n`)
+
+  const resultsDir = path.join(__dirname, 'results')
+  if (!fs.existsSync(resultsDir)) {
+    fs.mkdirSync(resultsDir)
+  }
+  const reportPath = path.join(resultsDir, 'longdoc_report.md')
+  fs.writeFileSync(reportPath, mdReport, 'utf-8')
+  console.log(`Saved detailed evaluation report to ${reportPath}`)
   console.log(`════════════════════════════════════════════════════════`)
 }
 

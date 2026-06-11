@@ -1,0 +1,82 @@
+[
+  {
+    "question": "What were the 3 specific categories of existing tools that the initial research said were already solved and should not be touched?",
+    "answer": ""
+  },
+  {
+    "question": "What exact dollar amount was the Cloudflare Durable Objects loop bill that was cited as an example of the AI spend protection problem?",
+    "answer": ""
+  },
+  {
+    "question": "What was the exact naming convention argument made for choosing \"mcpunit\" over other name options?",
+    "answer": ""
+  },
+  {
+    "question": "What were the exact 4 files in the Priority 1 fixes that Windsurf needed to modify, and what specific change was required for each?",
+    "answer": ""
+  },
+  {
+    "question": "What exact command does mcpunit use internally to determine if a server is ready before running tests, and what is the default timeout?",
+    "answer": ""
+  },
+  {
+    "question": "What was the specific bug found with the @ character in package names, and in which version was it fixed?",
+    "answer": ""
+  },
+  {
+    "question": "What are the exact 3 MCP tools that Headroom exposes as an MCP server, and what does each do?",
+    "answer": ""
+  },
+  {
+    "question": "What is the fundamental architectural reason why claude-mem works with Cursor Pro but the proxy approach does not?",
+    "answer": ""
+  },
+  {
+    "question": "What exact lifecycle events does claude-mem hook into to capture information?",
+    "answer": ""
+  },
+  {
+    "question": "What specific assertion format does mcp-jest use that makes it different from mcpunit's YAML approach?",
+    "answer": ""
+  },
+  {
+    "question": "What were the exact 4 bugs mcpunit found in the UniMemory server, and what was wrong with each one specifically?",
+    "answer": ""
+  },
+  {
+    "question": "What is the exact threshold for npm weekly downloads above which you can be sure you're seeing real signal instead of noise?",
+    "answer": ""
+  },
+  {
+    "question": "What exact version of the package was published when the --headers CLI option was added, and what was the commit message?",
+    "answer": ""
+  },
+  {
+    "question": "What are the exact 3 UniMemory API calls the proxy layer needs to make for every user message, in order?",
+    "answer": ""
+  },
+  {
+    "question": "What specific problem did claude-mem v3 encounter that caused v4 to retreat to an 800-token index?",
+    "answer": ""
+  },
+  {
+    "question": "What exact GitHub Actions YAML snippet was given for integrating mcpunit into CI?",
+    "answer": ""
+  },
+  {
+    "question": "What is the exact reason Supermemory's Memory Router hasn't dominated despite solving the same problem as the proposed UniMemory proxy?",
+    "answer": ""
+  },
+  {
+    "question": "What specific files were created during Phase 1 through Phase 6 of the v0.3.0 build, and what does each one do?",
+    "answer": ""
+  },
+  {
+    "question": "What exact npm support email subject line and key argument was drafted for requesting the mcptest package name?",
+    "answer": ""
+  },
+  {
+    "question": "What is the exact positioning statement that distinguishes MCP Inspector from mcpunit in terms of what question each answers?",
+    "answer": ""
+  }
+]

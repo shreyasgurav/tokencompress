@@ -7,3 +7,18 @@ coverage/
 .vitest/
 *.tsbuildinfo
 .env
+
+# Scratch/temp
+scratch/
+
+# Python venv
+.venv/
+model/.venv/
+
+# Large model files
+model/*.safetensors
+model/*.bin
+model/*.zip
+model/config.json
+model/tokenizer.json
+model/tokenizer_config.json

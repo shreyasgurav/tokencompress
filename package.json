@@ -31,6 +31,8 @@
     "benchmark:quick": "npx tsx benchmarks/squad.ts --limit 20",
     "benchmark:long": "npx tsx benchmarks/longdoc.ts",
     "benchmark:dj": "npx tsx benchmarks/dj.ts",
+    "benchmark:testconvo": "npx tsx benchmarks/testconvo.ts",
+    "benchmark:compare": "npx tsx benchmarks/compare.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

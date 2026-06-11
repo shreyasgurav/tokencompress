@@ -7,8 +7,8 @@ import { isCorrectLLM } from './evaluate.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fetchApi = typeof fetch !== 'undefined' ? fetch : require('node-fetch')
 
-const TARGET_DOC = '/Users/shreyasgurav/Downloads/ChatGPT-DJ .md'
-const QUESTIONS_FILE = path.join(__dirname, 'data', 'dj_qa.json')
+const TARGET_DOC = '/Users/shreyasgurav/Downloads/testconvo.md'
+const QUESTIONS_FILE = path.join(__dirname, 'data', 'testconvo_qa.json')
 
 const apiKey = process.env.OPENAI_API_KEY
 
@@ -16,21 +16,21 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function askModel(context: string, question: string, retries = 3): Promise<string> {
+async function askModel(context: string, question: string, retries = 15): Promise<string> {
   const systemPrompt = `You are a strict reading comprehension bot. Answer the user's question using ONLY the provided context. Keep your answer as short as possible (1-5 words if possible). If you cannot answer it from the context, output "I don't know".`
   const userPrompt = `Context:\n${context}\n\nQuestion: ${question}`
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    await sleep(500) // Explicit 500ms delay between ALL API calls
+    await sleep(500)
     
-    const res = await fetchApi('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchApi('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gemini-2.0-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -41,9 +41,9 @@ async function askModel(context: string, question: string, retries = 3): Promise
     })
 
     if (!res.ok) {
-      if ((res.status === 520 || res.status === 429) && attempt < retries) {
-        console.warn(`\n[Retry] API error ${res.status}. Waiting 10s...`)
-        await sleep(10000) // 10s backoff for rate limits or CF errors
+      if ((res.status === 520 || res.status === 429) && attempt < 15) {
+        console.warn(`\n[Retry] API error ${res.status}. Waiting 15s...`)
+        await sleep(15000)
         continue
       }
       const err = await res.text()
@@ -62,7 +62,6 @@ async function runBenchmark() {
     process.exit(1)
   }
 
-  // Parse command line arguments
   const args = process.argv.slice(2)
   let limit = -1
   const limitIdx = args.indexOf('--limit')
@@ -70,17 +69,20 @@ async function runBenchmark() {
     limit = parseInt(args[limitIdx + 1], 10)
   }
 
+  let ratio = 0.5
+  const ratioIdx = args.indexOf('--ratio')
+  if (ratioIdx !== -1 && args[ratioIdx + 1]) {
+    ratio = parseFloat(args[ratioIdx + 1])
+  }
+
   console.log(`\nLoading document: ${TARGET_DOC}`)
   const rawContent = fs.readFileSync(TARGET_DOC, 'utf-8')
-  
-  // Use the FULL document (all ~46k tokens)
   const passage = rawContent
 
   const QUESTIONS = JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf-8'))
   const questionsToRun = limit > 0 ? QUESTIONS.slice(0, limit) : QUESTIONS
 
-  // Setup Cache
-  const CACHE_FILE = path.join(__dirname, 'data', 'dj_control_cache.json')
+  const CACHE_FILE = path.join(__dirname, 'data', 'testconvo_control_cache.json')
   let cache: Record<string, { answer: string; correct: boolean }> = {}
   if (fs.existsSync(CACHE_FILE)) {
     try {
@@ -91,8 +93,8 @@ async function runBenchmark() {
     }
   }
 
-  console.log(`Compressing document using ML Model...`)
-  const cRes = await compressAsync(passage, { targetRatio: 0.5 })
+  console.log(`Compressing document using ML Model (target ratio: ${ratio})...`)
+  const cRes = await compressAsync(passage, { targetRatio: ratio })
   const compressedPassage = cRes.compressed
 
   console.log(`Original: ${cRes.tokensBefore} tokens`)
@@ -114,7 +116,7 @@ async function runBenchmark() {
       .trim();
   }
   
-  let mdReport = `# DJ Benchmark LLM Evaluation Report\n\n`
+  let mdReport = `# TestConvo Benchmark LLM Evaluation Report\n\n`
   mdReport += `**Original Tokens:** ${cRes.tokensBefore}\n`
   mdReport += `**Compressed Tokens:** ${cRes.tokensAfter} (${((1 - cRes.tokensAfter / cRes.tokensBefore) * 100).toFixed(1)}% reduction)\n\n`
   mdReport += `## Detailed Results\n\n`
@@ -128,16 +130,18 @@ async function runBenchmark() {
     let compressedAnswer = ''
     let errorOccurred = false
 
-    // 1. Get Control Answer & Correctness
+    // 1. Get Control Answer
     if (cache[q.question]) {
       controlAnswer = cache[q.question].answer
       controlCorrect = cache[q.question].correct
     } else {
       try {
         controlAnswer = await askModel(passage, q.question)
-        const acceptedAnswers = [q.answer]
-        controlCorrect = await isCorrectLLM(q.question, acceptedAnswers, controlAnswer)
+        // Since we don't have human-provided ground truth answers for these new questions,
+        // we treat the Control Model's answer (from the full 100% context document) as the objective ground truth!
+        controlCorrect = true 
         cache[q.question] = { answer: controlAnswer, correct: controlCorrect }
+        try { fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), 'utf-8') } catch(e){}
         cacheUpdated = true
       } catch (e: any) {
         console.error(`\nError on Control Q${i+1}: ${e.message}`)
@@ -159,28 +163,25 @@ async function runBenchmark() {
       continue
     }
 
-    // 3. Judge Compressed Answer (Bypass LLM Judge if possible)
-    const acceptedAnswers = [q.answer]
+    // 3. Judge Compressed Answer
+    // We judge if the compressed answer matches what the Control model extracted from the full text
+    const expectedAnswers = q.answer ? [q.answer, controlAnswer] : [controlAnswer]
     let compressedCorrect = false
     let judgeBypassed = false
 
     const normCompressed = normalizeText(compressedAnswer)
     const normControl = normalizeText(controlAnswer)
-    const normExpected = normalizeText(q.answer)
     const normIDontKnow = normalizeText("I don't know")
 
-    if (normCompressed === normExpected) {
+    if (normCompressed === normControl) {
       compressedCorrect = true
-      judgeBypassed = true
-    } else if (normCompressed === normControl) {
-      compressedCorrect = controlCorrect
       judgeBypassed = true
     } else if (normCompressed === normIDontKnow || normCompressed === "") {
       compressedCorrect = false
       judgeBypassed = true
     } else {
       try {
-        compressedCorrect = await isCorrectLLM(q.question, acceptedAnswers, compressedAnswer)
+        compressedCorrect = await isCorrectLLM(q.question, expectedAnswers, compressedAnswer)
       } catch (e: any) {
         console.error(`\nError on Judging Q${i+1}: ${e.message}`)
         skippedDueToError++
@@ -191,10 +192,8 @@ async function runBenchmark() {
     if (controlCorrect) controlCorrectCount++
     if (compressedCorrect) compressedCorrectCount++
     
-    // Log for the report
     mdReport += `### Question ${i + 1}\n**Q:** ${q.question}\n\n`
-    mdReport += `**Expected:** ${q.answer}\n\n`
-    mdReport += `**Control Answer:** ${controlAnswer} \`[${controlCorrect ? 'PASS' : 'FAIL'}]\`\n\n`
+    mdReport += `**Expected (from Full Context):** ${controlAnswer}\n\n`
     mdReport += `**Compressed Answer:** ${compressedAnswer} \`[${compressedCorrect ? 'PASS' : 'FAIL'}]${judgeBypassed ? ' (Bypassed Judge)' : ''}\`\n\n`
     mdReport += `---\n\n`
   }
@@ -214,9 +213,9 @@ async function runBenchmark() {
   const compressedScore = ((compressedCorrectCount / validQuestions) * 100).toFixed(1)
   const retention = controlCorrectCount > 0 ? ((compressedCorrectCount / controlCorrectCount) * 100).toFixed(1) : "0"
 
-  console.log(`\n\ntokencompress benchmark — DJ Chat (Full Document)`)
+  console.log(`\n\ntokencompress benchmark — TestConvo (Technical Chat)`)
   console.log(`════════════════════════════════════════════════════════`)
-  console.log(`Document:          ChatGPT-DJ .md`)
+  console.log(`Document:          testconvo.md`)
   console.log(`Tokens before:     ${cRes.tokensBefore}`)
   console.log(`Tokens after:      ${cRes.tokensAfter}`)
   console.log(`Token reduction:   ${((1 - cRes.tokensAfter / cRes.tokensBefore) * 100).toFixed(1)}%`)
@@ -228,11 +227,6 @@ async function runBenchmark() {
     console.log(`Control Score:     ${controlCorrectCount} / ${validQuestions} (${controlScore}%)`)
     console.log(`Compressed Score:  ${compressedCorrectCount} / ${validQuestions} (${compressedScore}%)`)
     console.log(`Retention Rate:    ${retention}%`)
-    
-    mdReport += `## Summary\n\n`
-    mdReport += `- **Control Score:** ${controlScore}%\n`
-    mdReport += `- **Compressed Score:** ${compressedScore}%\n`
-    mdReport += `- **Retention:** ${retention}%\n`
   } else {
     console.log(`No valid questions answered due to errors.`)
   }
@@ -242,7 +236,7 @@ async function runBenchmark() {
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir)
   }
-  const reportPath = path.join(resultsDir, 'dj_report.md')
+  const reportPath = path.join(resultsDir, 'testconvo_report.md')
   fs.writeFileSync(reportPath, mdReport, 'utf-8')
   console.log(`Saved detailed evaluation report to ${reportPath}`)
 }

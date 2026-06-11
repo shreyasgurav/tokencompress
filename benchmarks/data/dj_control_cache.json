@@ -1,0 +1,162 @@
+{
+  "What Mac model did the user say they own for learning DJing?": {
+    "answer": "Mac M2 Pro",
+    "correct": true
+  },
+  "Which DJ software was the user already learning and considering continuing with?": {
+    "answer": "djay Pro",
+    "correct": true
+  },
+  "Which DJ controller did the user say they planned to buy after learning a bit more?": {
+    "answer": "DDJ-4",
+    "correct": true
+  },
+  "What was the first song in the DJ set that the user repeatedly referenced as the starting track?": {
+    "answer": "Bom Diggy Diggy",
+    "correct": true
+  },
+  "Which song did the user place immediately after Bom Diggy Diggy in the developing DJ set?": {
+    "answer": "Dilbar",
+    "correct": true
+  },
+  "What BPM value did the user state for Subah Hone Na De?": {
+    "answer": "132 BPM",
+    "correct": true
+  },
+  "What BPM value did the user state for Kala Chashma?": {
+    "answer": "106 BPM",
+    "correct": true
+  },
+  "What BPM value did the user state for Tamma Tamma Again?": {
+    "answer": "~123 BPM",
+    "correct": true
+  },
+  "What BPM value did the user state for Lungi Dance when rejecting it as a transition?": {
+    "answer": "The user stated that the BPM for Lungi Dance is 83.",
+    "correct": true
+  },
+  "Which song did the user say was mixing well directly after Kala Chashma?": {
+    "answer": "The user said \"Badtameez Dil\" was mixing well directly after \"Kala Chashma.\"",
+    "correct": true
+  },
+  "Which song did the user say was already placed after Abhi Toh Party Shuru Hui Hai?": {
+    "answer": "Let’s Nacho.",
+    "correct": true
+  },
+  "Which song was suggested as the best follow-up to Dilbar because of its similar Arabic/desi club vibe?": {
+    "answer": "O Saki Saki",
+    "correct": true
+  },
+  "Which song was suggested as the best follow-up to Kala Chashma in the revised low-BPM groove section?": {
+    "answer": "O Saki Saki",
+    "correct": true
+  },
+  "Which song was suggested immediately after O Saki Saki before the set was restructured?": {
+    "answer": "Aankh Marey.",
+    "correct": false
+  },
+  "Which song was proposed as the major energy jump after Kamariya?": {
+    "answer": "Abhi Toh Party Shuru Hui Hai",
+    "correct": true
+  },
+  "Which song was suggested after Let’s Nacho when building the set step by step?": {
+    "answer": "The Disco Song.",
+    "correct": true
+  },
+  "Which song was initially suggested after The Disco Song before BPM concerns were raised?": {
+    "answer": "**Party All Night**",
+    "correct": false
+  },
+  "Which song was first suggested after Subah Hone Na De but later rejected by the user because it felt too slow?": {
+    "answer": "Sauda Khara Khara",
+    "correct": true
+  },
+  "Which song was suggested as a replacement for Party All Night because Party All Night was not fitting the flow?": {
+    "answer": "Aankh Marey.",
+    "correct": false
+  },
+  "Which song was repeatedly suggested as the best track to follow Kar Gayi Chull before the user noted it had already been used?": {
+    "answer": "Aankh Marey",
+    "correct": true
+  },
+  "Which song was recommended as a fresh option after Kar Gayi Chull due to its similar BPM and party vibe?": {
+    "answer": "**Aankh Marey**",
+    "correct": false
+  },
+  "Which song was proposed as the best continuation after Aankh Marey?": {
+    "answer": "**Dil Chori**",
+    "correct": true
+  },
+  "What approximate duration was recommended for a beginner DJ practice set?": {
+    "answer": "15–25 minutes.",
+    "correct": true
+  },
+  "What duration was recommended for the user's planned Alibaug villa party DJ set?": {
+    "answer": "45–60 minutes.",
+    "correct": true
+  },
+  "How many people did the user estimate would attend the Alibaug villa trip?": {
+    "answer": "10 people.",
+    "correct": true
+  },
+  "What DJing style was identified as matching the user's interest in Bollywood, Punjabi, Marathi, and English-Hindi mashups?": {
+    "answer": "Commercial / Open Format DJing",
+    "correct": true
+  },
+  "What specific transition method was recommended for songs with very different BPMs?": {
+    "answer": "Drop switch method.",
+    "correct": true
+  },
+  "What was the first free DJ software recommended alongside VirtualDJ and Mixxx for learning on a laptop?": {
+    "answer": "djay (by Algoriddim)",
+    "correct": false
+  },
+  "Which DJ software was described as beginner-friendly and particularly good on a Mac M2 Pro?": {
+    "answer": "djay Pro",
+    "correct": true
+  },
+  "Which controller under ₹15,000 was repeatedly recommended as the best beginner learning controller?": {
+    "answer": "Hercules DJ Control Inpulse 200 MkII",
+    "correct": true
+  },
+  "What was the recommended progression before buying a DJ controller?": {
+    "answer": "Learn on laptop first.",
+    "correct": false
+  },
+  "Which song was identified as having approximately the same BPM as Dilbar and suggested as an easy transition?": {
+    "answer": "Aankh Marey",
+    "correct": false
+  },
+  "Which song was recommended after Lat Lag Gayee because it was in the same 130+ BPM range?": {
+    "answer": "Kamli",
+    "correct": false
+  },
+  "Which song was proposed as a new high-BPM option after Lat Lag Gayee when the user said earlier suggestions had already been played?": {
+    "answer": "Kamli",
+    "correct": true
+  },
+  "Which song was suggested after Besharmi Ki Height before the discussion moved to Tamma Tamma Again?": {
+    "answer": "Aankh Marey.",
+    "correct": false
+  },
+  "What was the exact sequence suggested for the beginning of the corrected groove section after the user moved Kala Chashma earlier?": {
+    "answer": "The exact sequence suggested for the beginning of the corrected groove section was:",
+    "correct": false
+  },
+  "What rule was given regarding BPM differences greater than about 8–10 BPM?": {
+    "answer": "Don't mix directly.",
+    "correct": false
+  },
+  "What practice recommendation was given before continuing to add more songs to the set?": {
+    "answer": "Practice ONLY the transitions between the current songs.",
+    "correct": false
+  },
+  "What was the recommended number of songs to prepare for a one-hour villa party set even though fewer might actually be played?": {
+    "answer": "20-25 songs.",
+    "correct": true
+  },
+  "What key DJ mindset was emphasized for the villa party instead of treating the music as a fixed playlist?": {
+    "answer": "Controlling vibe of the party.",
+    "correct": false
+  }
+}
