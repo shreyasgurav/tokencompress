@@ -1,0 +1,16 @@
+tokencompress v0.3.0
+──────────────────────────────
+Segments:      3
+Tokens before: 143,641
+Tokens after:  81,148
+Tokens saved:  62,493 (43.5%)
+
+Per-segment breakdown:
+  #0 text → text: 8 → 8 (saved 0)
+  #1 logs → logs: 52 → 52 (saved 0)
+  #2 text → text: 143,581 → 81,088 (saved 62,493)
+
+What was dropped:
+  • 7962 — Iterative compression completed after 2 passes
+  • 3927 — TF-IDF: preserved 3927 sentences by importance signal (numbers, errors, decisions)
+──────────────────────────────

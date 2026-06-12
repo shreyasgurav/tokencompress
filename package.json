@@ -1,6 +1,6 @@
 {
   "name": "tokencompress",
-  "version": "0.6.1",
+  "version": "1.0.1",
   "description": "Removes redundant tokens from LLM inputs before they hit the model. Shows exactly what was dropped and why.",
   "type": "module",
   "main": "dist/index.js",
@@ -17,6 +17,20 @@
   },
   "files": [
     "dist",
+    "model/output/tokencompress-base/onnx/model_quantized.onnx",
+    "model/output/tokencompress-base/onnx/config.json",
+    "model/output/tokencompress-base/onnx/tokenizer.json",
+    "model/output/tokencompress-base/onnx/tokenizer_config.json",
+    "model/output/tokencompress-base/onnx/vocab.json",
+    "model/output/tokencompress-base/onnx/merges.txt",
+    "model/output/tokencompress-base/onnx/special_tokens_map.json",
+    "model/output/tokencompress-base/onnx/ort_config.json",
+    "model/output/tokencompress-base/config.json",
+    "model/output/tokencompress-base/tokenizer.json",
+    "model/output/tokencompress-base/tokenizer_config.json",
+    "model/output/tokencompress-base/vocab.json",
+    "model/output/tokencompress-base/merges.txt",
+    "model/output/tokencompress-base/special_tokens_map.json",
     "README.md",
     "LICENSE"
   ],
@@ -54,7 +68,8 @@
   "dependencies": {
     "@xenova/transformers": "^2.17.2",
     "commander": "^12.1.0",
-    "js-tiktoken": "^1.0.15"
+    "js-tiktoken": "^1.0.15",
+    "onnxruntime-node": "^1.14.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

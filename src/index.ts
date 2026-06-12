@@ -11,8 +11,8 @@ export {
   compressMessages,
   compressMessagesAsync,
 } from './compress.js'
-export { segmentAndCompress } from './segment/segment-compress.js'
-export { segmentDocument } from './segment/segmenter.js'
+export { segmentAndCompress, segmentAndCompressAsync } from './router/universal-router.js'
+export { segmentDocument } from './router/segmenter.js'
 export { detectType, detectContent } from './detector/content-detector.js'
 export { countTokens } from './tokens/counter.js'
 export { computeOptimalK } from './adaptive/sizer.js'

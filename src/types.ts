@@ -56,6 +56,8 @@ export interface CompressResult {
   transformsApplied: string[]
   /** Additional metrics about the compression (e.g., iterative passes). */
   metrics?: Record<string, any>
+  /** Detailed performance metrics broken down by compressor. */
+  telemetry?: TelemetryData
 }
 
 export interface IterativeOptions {
@@ -76,6 +78,10 @@ export interface CompressOptions {
   maxTokens?: number
   /** Iterative compression settings. */
   iterative?: IterativeOptions
+  /** Optional callback for tracking compression progress (0-100). */
+  onProgress?: (progress: number, message?: string, segmentIndex?: number, segmentType?: string) => void
+  /** Optional signal to cancel the compression process. */
+  signal?: AbortSignal
 }
 
 /** An OpenAI/Anthropic-style chat message. */
@@ -169,6 +175,21 @@ export interface SegmentedCompressResult {
   dropped: DroppedItem[]
   /** Ordered transform identifiers applied across the document. */
   transformsApplied: string[]
+  /** Detailed performance metrics broken down by compressor. */
+  telemetry?: TelemetryData
+}
+
+export interface CompressorTelemetry {
+  timeMs: number
+  blocksProcessed: number
+  tokensBefore: number
+  tokensAfter: number
+  sentenceCount?: number
+}
+
+export interface TelemetryData {
+  totalTimeMs: number
+  compressors: Record<string, CompressorTelemetry>
 }
 
 export interface ResolvedIterativeOptions {
@@ -185,6 +206,8 @@ export interface ResolvedOptions {
   targetRatio: number
   maxTokens: number | undefined
   iterative: ResolvedIterativeOptions
+  onProgress?: (progress: number, message?: string, segmentIndex?: number, segmentType?: string) => void
+  signal?: AbortSignal
 }
 
 export const DEFAULT_OPTIONS: ResolvedOptions = {
@@ -209,6 +232,8 @@ export function resolveOptions(options?: CompressOptions): ResolvedOptions {
         ? Math.min(0.9, Math.max(0.1, options.targetRatio))
         : DEFAULT_OPTIONS.targetRatio,
     maxTokens: options?.maxTokens,
+    onProgress: options?.onProgress,
+    signal: options?.signal,
     iterative: {
       enabled: options?.iterative?.enabled ?? DEFAULT_OPTIONS.iterative.enabled,
       maxPasses: options?.iterative?.maxPasses ?? DEFAULT_OPTIONS.iterative.maxPasses,

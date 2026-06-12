@@ -17,7 +17,6 @@ import type {
   ResolvedOptions,
 } from './types.js'
 import { resolveOptions } from './types.js'
-import { detectContent } from './detector/content-detector.js'
 import { countTokens } from './tokens/counter.js'
 import { compressJson } from './compressors/json-compressor.js'
 import { compressLogs } from './compressors/log-compressor.js'
@@ -25,7 +24,7 @@ import { compressDiff } from './compressors/diff-compressor.js'
 import { compressSearch } from './compressors/search-compressor.js'
 import { compressCode } from './compressors/code-compressor.js'
 import { compressHtml } from './compressors/html-compressor.js'
-import { compressConversation } from './compressors/conversation-compressor.js'
+import { compressConversation, compressConversationAsync } from './compressors/conversation-compressor.js'
 import { compressText } from './compressors/text-compressor.js'
 import { compressIterative } from './compressors/iterative-compressor.js'
 import { compressML } from './compressors/ml-compressor.js'
@@ -61,6 +60,7 @@ const COMPRESSORS: Record<ContentType, CompressorFn> = {
   text: compressTextRouted,
 }
 
+
 /**
  * Async compressor map that uses the ML model for text/conversation
  */
@@ -71,7 +71,7 @@ const ASYNC_COMPRESSORS: Record<ContentType, AsyncCompressorFn> = {
   search: async (text, opts) => compressSearch(text, opts),
   code: async (text, opts) => compressCode(text, opts),
   html: async (text, opts) => compressHtml(text, opts),
-  conversation: async (text, opts) => compressML(text, opts),
+  conversation: async (text, opts) => compressConversationAsync(text, opts),
   text: async (text, opts) => compressML(text, opts),
 }
 
@@ -105,8 +105,9 @@ export async function compressAsAsync(
   try {
     const output = await ASYNC_COMPRESSORS[contentType](text, opts)
     return buildResult(text, contentType, confidence, output, opts)
-  } catch (err) {
+  } catch (err: any) {
     console.error(`Async compression failed for ${contentType}:`, err)
+    import('fs').then(fs => fs.writeFileSync('/tmp/error_log.txt', err.stack || String(err)))
     return failOpenResult(text, contentType, confidence, opts)
   }
 }
@@ -160,11 +161,13 @@ function buildResult(
   }
 }
 
+import { detectContent } from './detector/content-detector.js'
+
 /**
  * Compress a raw string.
  *
- * Detects the content type, routes to the matching compressor, and returns
- * a full {@link CompressResult} including the `dropped` report.
+ * Automatically detects the content type and routes to the matching
+ * compressor. To segment mixed-content documents, use `segmentAndCompress`.
  */
 export function compress(text: string, options?: CompressOptions): CompressResult {
   const opts = resolveOptions(options)
@@ -178,7 +181,10 @@ export function compress(text: string, options?: CompressOptions): CompressResul
 }
 
 /**
- * Compress a raw string asynchronously using the ML model.
+ * Compress a raw string asynchronously.
+ *
+ * Automatically detects the content type and routes to the matching
+ * async compressor.
  */
 export async function compressAsync(text: string, options?: CompressOptions): Promise<CompressResult> {
   const opts = resolveOptions(options)
@@ -188,7 +194,7 @@ export async function compressAsync(text: string, options?: CompressOptions): Pr
   }
 
   const detection = detectContent(text)
-  return compressAsAsync(text, detection.type, detection.confidence, opts)
+  return await compressAsAsync(text, detection.type, detection.confidence, opts)
 }
 
 /**

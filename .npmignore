@@ -1,0 +1,33 @@
+# Ignore source files, tests, and benchmarks
+src/
+tests/
+benchmarks/
+examples/
+scratch/
+
+# Ignore Python and Model Training environments
+.venv/
+model/.venv/
+model/__pycache__/
+model/data/
+model/scripts/
+model/checkpoints/
+
+# Ignore TypeScript outputs
+*.tsbuildinfo
+.vitest/
+coverage/
+
+# Ignore local config files
+.env
+.github/
+.gitignore
+
+# IGNORE MASSIVE RAW MODELS
+# We only want to ship the quantized model
+model/**/*.safetensors
+model/**/*.bin
+model/**/*.zip
+model/**/model.onnx
+model/output/tokencompress-base/model.onnx
+model/output/tokencompress-base/onnx/model.onnx

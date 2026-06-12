@@ -8,14 +8,12 @@
  *   tokencompress compress --stdin        compress piped stdin
  *   tokencompress detect <input>          just print the detected type
  *   tokencompress benchmark <file>        compress a file, print full stats
- *   tokencompress segment <input>         compress a mixed-content document
  */
 import { readFileSync } from 'node:fs'
 import { Command } from 'commander'
-import { compress, compressAsync } from './compress.js'
-import { segmentAndCompress } from './segment/segment-compress.js'
+import { segmentAndCompress, segmentAndCompressAsync } from './router/universal-router.js'
 import { detectContent } from './detector/content-detector.js'
-import type { CompressResult, SegmentedCompressResult } from './types.js'
+import type { SegmentedCompressResult } from './types.js'
 
 const VERSION = '0.3.0'
 
@@ -45,37 +43,10 @@ function fmt(n: number): string {
   return n.toLocaleString('en-US')
 }
 
-function printReport(result: CompressResult): void {
+function printReport(result: SegmentedCompressResult): void {
   const pct = (result.compressionRatio * 100).toFixed(1)
   const line = '─'.repeat(30)
   process.stderr.write(`tokencompress v${VERSION}\n`)
-  process.stderr.write(`${line}\n`)
-  process.stderr.write(
-    `Content type:  ${result.contentType} (confidence ${(result.confidence * 100).toFixed(0)}%)\n`,
-  )
-  process.stderr.write(`Tokens before: ${fmt(result.tokensBefore)}\n`)
-  process.stderr.write(`Tokens after:  ${fmt(result.tokensAfter)}\n`)
-  process.stderr.write(`Tokens saved:  ${fmt(result.tokensSaved)} (${pct}%)\n\n`)
-
-  process.stderr.write('Transforms applied:\n')
-  for (const t of result.transformsApplied) {
-    process.stderr.write(`  ${t}\n`)
-  }
-
-  if (result.dropped.length > 0) {
-    process.stderr.write('\nWhat was dropped:\n')
-    for (const d of result.dropped) {
-      process.stderr.write(`  • ${d.count} — ${d.reason}\n`)
-      if (d.sample) process.stderr.write(`      e.g. ${d.sample}\n`)
-    }
-  }
-  process.stderr.write(`${line}\n`)
-}
-
-function printSegmentReport(result: SegmentedCompressResult): void {
-  const pct = (result.compressionRatio * 100).toFixed(1)
-  const line = '─'.repeat(30)
-  process.stderr.write(`tokencompress v${VERSION} — segmented\n`)
   process.stderr.write(`${line}\n`)
   process.stderr.write(`Segments:      ${result.segments.length}\n`)
   process.stderr.write(`Tokens before: ${fmt(result.tokensBefore)}\n`)
@@ -92,7 +63,7 @@ function printSegmentReport(result: SegmentedCompressResult): void {
   }
 
   if (result.dropped.length > 0) {
-    process.stderr.write('\nWhat was dropped (aggregated):\n')
+    process.stderr.write('\nWhat was dropped:\n')
     for (const d of result.dropped) {
       process.stderr.write(`  • ${d.count} — ${d.reason}\n`)
       if (d.sample) process.stderr.write(`      e.g. ${d.sample}\n`)
@@ -121,7 +92,7 @@ program
     try {
       const text = await resolveInput(input, options.file, options.stdin)
       const opts = { model: options.model, targetRatio: options.ratio }
-      const result = options.ml ? await compressAsync(text, opts) : compress(text, opts)
+      const result = options.ml ? await segmentAndCompressAsync(text, opts) : segmentAndCompress(text, opts)
       if (!options.quiet) printReport(result)
       process.stdout.write(result.compressed + '\n')
     } catch (err) {
@@ -158,29 +129,8 @@ program
     try {
       const text = readFileSync(file, 'utf8')
       const opts = { model: options.model, targetRatio: options.ratio }
-      const result = options.ml ? await compressAsync(text, opts) : compress(text, opts)
+      const result = options.ml ? await segmentAndCompressAsync(text, opts) : segmentAndCompress(text, opts)
       printReport(result)
-    } catch (err) {
-      process.stderr.write(`Error: ${(err as Error).message}\n`)
-      process.exit(1)
-    }
-  })
-
-program
-  .command('segment')
-  .description('Compress a mixed-content document block-by-block (prose + code + JSON + logs).')
-  .argument('[input]', 'text to compress (or use --file / --stdin)')
-  .option('-f, --file <path>', 'read input from a file')
-  .option('-s, --stdin', 'read input from stdin')
-  .option('-m, --model <model>', 'model for token counting', 'gpt-4o')
-  .option('-r, --ratio <ratio>', 'target compression ratio 0.1-0.9', parseFloat)
-  .option('--quiet', 'suppress the stats report (only print compressed output)')
-  .action(async (input, options) => {
-    try {
-      const text = await resolveInput(input, options.file, options.stdin)
-      const result = segmentAndCompress(text, { model: options.model, targetRatio: options.ratio })
-      if (!options.quiet) printSegmentReport(result)
-      process.stdout.write(result.compressed + '\n')
     } catch (err) {
       process.stderr.write(`Error: ${(err as Error).message}\n`)
       process.exit(1)

@@ -17,42 +17,44 @@ env.useBrowserCache = false // Node only
 // __dirname here is dist/compressors/ at runtime
 env.localModelPath = path.resolve(__dirname, '../../model/output')
 
-let classifierPipeline: any = null
+let classifierPipelinePromise: Promise<any> | null = null
 
 async function getPipeline() {
-  if (!classifierPipeline) {
-    // Monkey-patch onnxruntime-node to configure thread count for CPU inference
-    if (typeof process !== 'undefined' && process?.release?.name === 'node') {
-      try {
-        const ort = await import('onnxruntime-node')
-        const ortModule = (ort as any).default ?? ort
-        const originalCreate = ortModule.InferenceSession?.create
-        if (originalCreate && !(originalCreate as any).__isPatched) {
-          const patched = async function(modelPathOrBuffer: any, options: any) {
-            const customOptions = {
-              ...options,
-              intraOpNumThreads: 4, // limit to 4 threads to prevent overheating and context-switching overhead
-              interOpNumThreads: 1
+  if (!classifierPipelinePromise) {
+    classifierPipelinePromise = (async () => {
+      // Monkey-patch onnxruntime-node to configure thread count for CPU inference
+      if (typeof process !== 'undefined' && process?.release?.name === 'node') {
+        try {
+          const ort = await import('onnxruntime-node')
+          const ortModule = (ort as any).default ?? ort
+          const originalCreate = ortModule.InferenceSession?.create
+          if (originalCreate && !(originalCreate as any).__isPatched) {
+            const patched = async function(modelPathOrBuffer: any, options: any) {
+              const customOptions = {
+                ...options,
+                intraOpNumThreads: 4, // limit to 4 threads to prevent overheating and context-switching overhead
+                interOpNumThreads: 1
+              }
+              return originalCreate.call(ortModule.InferenceSession, modelPathOrBuffer, customOptions)
             }
-            return originalCreate.call(ortModule.InferenceSession, modelPathOrBuffer, customOptions)
+            ;(patched as any).__isPatched = true
+            ortModule.InferenceSession.create = patched
           }
-          ;(patched as any).__isPatched = true
-          ortModule.InferenceSession.create = patched
+        } catch (err) {
+          console.warn('Failed to monkeypatch onnxruntime-node session options:', err)
         }
-      } catch (err) {
-        console.warn('Failed to monkeypatch onnxruntime-node session options:', err)
       }
-    }
 
-    console.log('Loading ML model from:', env.localModelPath)
-    // Point to the root model folder (where tokenizer.json lives)
-    // transformers.js will automatically look in the 'onnx/' subfolder for model.onnx
-    classifierPipeline = await pipeline('text-classification', 'tokencompress-base', {
-      local_files_only: true,
-      quantized: true, // Use the dynamically quantized model
-    })
+      console.log('Loading ML model from:', env.localModelPath)
+      // Point to the root model folder (where tokenizer.json lives)
+      // transformers.js will automatically look in the 'onnx/' subfolder for model.onnx
+      return await pipeline('text-classification', 'tokencompress-base', {
+        local_files_only: true,
+        quantized: true, // Use the dynamically quantized model
+      })
+    })()
   }
-  return classifierPipeline
+  return classifierPipelinePromise
 }
 
 interface Sentence {
@@ -188,10 +190,14 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
   
   if (ambiguous.length > 0) {
     const classifier = await getPipeline()
-    const batchSize = 1
+    const batchSize = 16
     const threshold = 1.0 - opts.targetRatio
     
     for (let i = 0; i < ambiguous.length; i += batchSize) {
+      if (opts.signal?.aborted) {
+        throw new Error('Compression aborted by user')
+      }
+      
       const chunk = ambiguous.slice(i, i + batchSize)
       const inputStrings = chunk.map((s) => {
         const globalIdx = raw.findIndex((rs) => rs.index === s.index)
@@ -247,5 +253,6 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
     compressed,
     dropped,
     transforms: [`ml:roberta(${raw.length}sentences->${kept.length}sentences)`],
+    metrics: { sentenceCount: raw.length },
   }
 }

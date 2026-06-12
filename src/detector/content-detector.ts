@@ -120,27 +120,27 @@ export function detectContent(text: string): DetectionResult {
     return { type: 'conversation', confidence, metadata: { speakers: Array.from(speakers) } }
   }
 
-  // 5. Search results — >30% of the first 30 lines look like file:line: matches.
+  // 6. Search results — >30% of the first 30 lines look like file:line: matches.
   const first30 = lines.slice(0, 30)
   const searchFrac = fractionMatching(first30, (l) => SEARCH_LINE.test(l.trim()))
   if (searchFrac > 0.3) {
     return { type: 'search', confidence: Math.min(1, 0.4 + searchFrac * 0.6), metadata: {} }
   }
 
-  // 5. Logs — >30% of the first 50 lines carry a log level or timestamp.
+  // 7. Logs — >30% of the first 50 lines carry a log level or timestamp.
   const logFrac = fractionMatching(first50, (l) => LOG_PATTERN.test(l))
   if (logFrac > 0.3) {
     return { type: 'logs', confidence: Math.min(1, 0.4 + logFrac * 0.6), metadata: {} }
   }
 
-  // 6. Code — >20% of non-empty lines start with a code keyword.
+  // 8. Code — >20% of non-empty lines start with a code keyword.
   const nonEmpty = lines.filter((l) => l.trim().length > 0)
   const codeFrac = fractionMatching(nonEmpty, (l) => CODE_PATTERN.test(l.trimStart()))
   if (codeFrac > 0.2) {
     return { type: 'code', confidence: Math.min(1, 0.4 + codeFrac * 0.6), metadata: {} }
   }
 
-  // 7. Default.
+  // 9. Default.
   return { type: 'text', confidence: 0.5, metadata: {} }
 }
 

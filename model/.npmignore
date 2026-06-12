@@ -1,0 +1,7 @@
+# This file overrides model/.gitignore so npm packages the output directory
+__pycache__/
+*.pyc
+.env
+.venv/
+checkpoints/
+data/

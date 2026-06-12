@@ -9,10 +9,15 @@ Every result includes a `dropped[]` report. Nothing is removed silently.
 - **Explainable** — `dropped[]` lists every removal with a reason, count, and sample.
 - **Adaptive** — keep-counts are chosen by information-saturation detection, not hardcoded limits, so near-duplicate data collapses hard while diverse data is barely touched.
 - **Prose-aware** — plain text is compressed by TF-IDF extractive summarization: high-signal sentences (numbers, errors, decisions, entities) are always kept while filler is dropped.
-- **Local & dependency-light** — pure TypeScript, no native binaries, no ML model, no API calls.
-- **Fail-open** — if anything goes wrong, you get the original text back, never an error.
+- **Semantic ML Routing** — conversation text is compressed using a highly-optimized local ML model (`all-MiniLM-L6-v2`) via ONNX Runtime to keep contextually relevant sentences. 
+- **Universal Router** — intermingled JSON, code blocks, logs, and text are automatically segmented, routed to specialized compressors, and reassembled losslessly in parallel.
+- **Local & TypeScript-native** — 100% local processing. No API keys, no network calls. The only TypeScript-native context compression library.
+- **Fail-open & Cancellable** — falls back to original text if anything throws. Full `AbortSignal` support to instantly cancel heavy ML workloads.
 
 ## Benchmarks
+
+**Large Document (Parallel Mixed-Content Compression)**
+- `140k tokens` (500 interleaved blocks of Prose, JSON, Logs, Code) — 72.2% reduction. Processed completely locally in **19.7 seconds**.
 
 **Conversational Documents (Turn-Aware Compression)**
 Unlike standard naive TF-IDF which destroys the structural thread of chat histories, our Turn-Aware Conversational Compression protects the back-and-forth structure while internally crushing verbose assistant responses.
@@ -126,16 +131,25 @@ interface CompressResult {
   tokensAfter: number
   tokensSaved: number
   compressionRatio: number        // 0.0 – 1.0
-  contentType: 'json' | 'logs' | 'diff' | 'search' | 'code' | 'html' | 'text'
+  contentType: 'json' | 'logs' | 'diff' | 'search' | 'code' | 'html' | 'text' | 'conversation'
   confidence: number              // 0.0 – 1.0 confidence in the detected type
   dropped: DroppedItem[]          // exactly what was removed and why
   transformsApplied: string[]
+  telemetry?: Record<string, CompressorTelemetry>
 }
 
 interface DroppedItem {
   reason: string
   count: number
   sample?: string
+}
+
+interface CompressorTelemetry {
+  timeMs: number
+  blocksProcessed: number
+  tokensBefore: number
+  tokensAfter: number
+  sentenceCount?: number          // populated for ML text compression
 }
 ```
 
@@ -188,6 +202,7 @@ compress(text, {
   model: 'gpt-4o',     // token-counting model (default 'gpt-4o')
   targetRatio: 0.3,    // 0.1 (gentle) – 0.9 (aggressive), default 0.3
   maxTokens: 2000,     // optional hard cap used by text truncation
+  signal: abortCtrl.signal // optional AbortSignal to cancel compression
 })
 ```
 
