@@ -46,8 +46,8 @@ export function countTokens(text: string, model = 'gpt-4o'): number {
   if (!text) return 0
   try {
     const enc = getEncoderForModel(model)
-    return enc.encode(text).length
-  } catch {
+    return enc.encode(text, 'all').length
+  } catch (err) {
     return Math.max(1, Math.ceil(text.length / 4))
   }
 }
