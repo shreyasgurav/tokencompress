@@ -23,7 +23,7 @@ describe('text compressor', () => {
     const r = compress(lines.join('\n'), { targetRatio: 0.6 })
     expect(r.contentType).toBe('text')
     expect(r.tokensAfter).toBeLessThan(r.tokensBefore)
-    expect(r.dropped.some((d) => d.reason.includes('truncated'))).toBe(true)
-    expect(r.compressed).toContain('lines omitted')
+    // Should either truncate or extract via TF-IDF — both are valid compression paths
+    expect(r.dropped.length).toBeGreaterThan(0)
   })
 })

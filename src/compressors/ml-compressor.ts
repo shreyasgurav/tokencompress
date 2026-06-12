@@ -171,14 +171,15 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
       /<\|eot_id\|>/.test(text) ||
       // XML-like structural tags (often used by Claude) at start of sentence
       /^<\/?(instructions|context|example|input|output|system)>/i.test(text) ||
-      // Markdown headers
-      /^#+\s/.test(text);
+      // Only top-level markdown headers (# or ##) which indicate major section breaks,
+      // NOT sub-headers (###, ####) which are often decorative inside AI responses.
+      /^#{1,2}\s/.test(text);
 
     if (i === 0 || i === N - 1 || isSpeakerTag) {
       autoKeep.add(s.index)
     } else if (score >= p90) {
       autoKeep.add(s.index)
-    } else if (score <= p30 && !hasSignal && s.text.length < 120) {
+    } else if (score <= p30 && !hasSignal && s.text.length < 200) {
       autoDrop.add(s.index)
     } else {
       ambiguous.push(s)

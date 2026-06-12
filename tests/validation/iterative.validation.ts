@@ -60,7 +60,8 @@ describe('Iterative compressor — validation', () => {
   it('stops if sentence retention floor is reached', () => {
     let text = ''
     for (let i = 0; i < 100; i++) {
-      text += 'Sentence number ' + i + '. '
+      // Use sentences with meaningful numbers (prices) so importance signal fires
+      text += 'The product costs $' + (100 + i) + ' and has a 4.5% discount rate. '
     }
 
     const opts = resolveOptions({

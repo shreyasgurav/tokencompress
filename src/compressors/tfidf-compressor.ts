@@ -20,7 +20,7 @@ import { countTokens } from '../tokens/counter.js'
 import { sample } from './shared.js'
 
 /** Below this many sentences, prose is too short to compress meaningfully. */
-const MIN_SENTENCES = 6
+const MIN_SENTENCES = 4
 /** Below this many tokens, the input isn't worth extractive compression. */
 const MIN_TOKENS = 80
 /** Multiplier applied to sentences carrying an importance signal. */
@@ -110,7 +110,10 @@ export function contentWords(sentence: string): string[] {
 }
 
 export function hasImportanceSignal(text: string): boolean {
-  if (/\d/.test(text)) return true // numbers / percentages / versions
+  // Only boost for meaningful numeric data: prices, percentages, versions,
+  // measurements with units, error codes — NOT plain ordinals like "Step 1"
+  if (/[$₹€£¥]\s*[\d,.]+|\d+(\.\d+)?%|\bv?\d+\.\d+(\.\d+)?\b/.test(text)) return true
+  if (/\b\d{3,}\b/.test(text)) return true // 3+ digit numbers (prices, codes, IDs)
   if (/\?/.test(text)) return true // questions are usually important
   if (IMPORTANCE_WORDS.test(text)) return true // decisions / errors / warnings
   return false
