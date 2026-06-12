@@ -187,12 +187,12 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
   }
 
   // Only run ML model on ambiguous sentences
-  const mlKeepSet = new Set<number>()
+  // Store probabilities instead of immediately keeping
+  const ambiguousWithProb: { s: Pick<Sentence, 'index' | 'text' | 'trailing'>; prob: number }[] = []
   
   if (ambiguous.length > 0) {
     const classifier = await getPipeline()
     const batchSize = 16
-    const threshold = 1.0 - opts.targetRatio
     
     for (let i = 0; i < ambiguous.length; i += batchSize) {
       if (opts.signal?.aborted) {
@@ -221,14 +221,31 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
           prob = 1.0 - output.score
         }
         
-        if (prob >= threshold) {
-          mlKeepSet.add(s.index)
-        }
+        ambiguousWithProb.push({ s, prob })
       }
     }
   }
 
-  const finalKeepSet = new Set<number>([...autoKeep, ...mlKeepSet])
+  // Enforce the token budget
+  const keepBudget = Math.max(1, Math.floor(totalTokens * (1 - opts.targetRatio)))
+  let keptTokens = 0
+  const finalKeepSet = new Set<number>([...autoKeep])
+  
+  // Account for tokens already kept in autoKeep
+  for (const s of raw) {
+    if (finalKeepSet.has(s.index)) {
+      keptTokens += countTokens(s.text, opts.model)
+    }
+  }
+
+  // Greedily add the highest probability ambiguous sentences until budget is hit
+  ambiguousWithProb.sort((a, b) => b.prob - a.prob)
+  
+  for (const item of ambiguousWithProb) {
+    if (keptTokens >= keepBudget) break
+    finalKeepSet.add(item.s.index)
+    keptTokens += countTokens(item.s.text, opts.model)
+  }
   const kept = raw.filter((s) => finalKeepSet.has(s.index))
   const droppedSentences = raw.filter((s) => !finalKeepSet.has(s.index))
   const droppedCount = droppedSentences.length
