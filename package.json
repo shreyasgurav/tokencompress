@@ -1,6 +1,6 @@
 {
   "name": "tokencompress",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Removes redundant tokens from LLM inputs before they hit the model. Shows exactly what was dropped and why.",
   "type": "module",
   "main": "dist/index.js",
