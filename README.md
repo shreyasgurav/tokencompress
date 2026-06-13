@@ -9,7 +9,7 @@ Every result includes a `dropped[]` report. Nothing is removed silently.
 - **Explainable** — `dropped[]` lists every removal with a reason, count, and sample.
 - **Adaptive** — keep-counts are chosen by information-saturation detection, not hardcoded limits, so near-duplicate data collapses hard while diverse data is barely touched.
 - **Prose-aware** — plain text is compressed by TF-IDF extractive summarization: high-signal sentences (numbers, errors, decisions, entities) are always kept while filler is dropped.
-- **Semantic ML Routing** — conversation text is compressed using a highly-optimized local ML model (`tokencompress-base`, a custom RoBERTa model trained on 599k conversational examples) via ONNX Runtime to keep contextually relevant sentences. 
+- **Semantic ML Routing** — conversation text is compressed using a highly-optimized local ML model (`tokencompress-minilm`, a custom MiniLM-L6 model trained on 599k conversational examples) via ONNX Runtime to keep contextually relevant sentences. 
 - **Universal Router** — intermingled JSON, code blocks, logs, and text are automatically segmented, routed to specialized compressors, and reassembled losslessly in parallel.
 - **Local & TypeScript-native** — 100% local processing. No API keys, no network calls. The only TypeScript-native context compression library.
 - **Fail-open & Cancellable** — falls back to original text if anything throws. Full `AbortSignal` support to instantly cancel heavy ML workloads.

@@ -22,3 +22,9 @@ model/*.zip
 model/config.json
 model/tokenizer.json
 model/tokenizer_config.json
+
+# Large model training artifacts (only ship model_quantized.onnx)
+model/output/*/model.safetensors
+model/output/*/training_args.bin
+model/output/*/onnx/model.onnx
+*.zip

@@ -133,40 +133,48 @@ export async function compressConversationAsync(text: string, opts: ResolvedOpti
     })
   }
 
+  if (opts.signal?.aborted) {
+    throw new Error('Compression aborted by user')
+  }
+
+  // Separate turns into passthrough (user/short) and compressible (long assistant)
+  const mlOpts: ResolvedOptions = { ...opts, targetRatio: 0.5 }
+  
+  // Process ALL compressible turns in parallel for maximum throughput
+  const turnResults = await Promise.all(
+    turns.map(async (turn, idx) => {
+      if (turn.tokens < 50 || turn.isUser) {
+        return { idx, text: turn.text, compressed: false, sentenceCount: 0, sample: '' }
+      }
+      const res = await compressML(turn.text, mlOpts)
+      if (res.dropped.length > 0) {
+        return {
+          idx,
+          text: res.compressed,
+          compressed: true,
+          sentenceCount: res.metrics?.sentenceCount ?? 0,
+          sample: res.dropped[0]?.sample || turn.text.slice(0, 100).replace(/\n/g, ' ')
+        }
+      }
+      return { idx, text: turn.text, compressed: false, sentenceCount: res.metrics?.sentenceCount ?? 0, sample: '' }
+    })
+  )
+
+  // Reassemble in original order
   let keptTurns = 0
   let compressedTurns = 0
   let firstCompressedTurnSample = ''
+  let totalSentenceCount = 0
   const processedTurns: string[] = []
 
-  let totalSentenceCount = 0
-
-  for (const turn of turns) {
-    if (opts.signal?.aborted) {
-      throw new Error('Compression aborted by user')
-    }
-    // Short turns (<50 tokens) and User/Human turns are kept untouched.
-    if (turn.tokens < 50 || turn.isUser) {
-      keptTurns++
-      processedTurns.push(turn.text)
+  for (const r of turnResults) {
+    processedTurns.push(r.text)
+    totalSentenceCount += r.sentenceCount
+    if (r.compressed) {
+      compressedTurns++
+      if (!firstCompressedTurnSample) firstCompressedTurnSample = r.sample
     } else {
-      // For assistant turns >= 50 tokens, run ML compressor
-      const mlOpts: ResolvedOptions = { ...opts, targetRatio: 0.5 }
-      const res = await compressML(turn.text, mlOpts)
-      
-      if (res.metrics?.sentenceCount) {
-        totalSentenceCount += res.metrics.sentenceCount
-      }
-      
-      if (res.dropped.length > 0) {
-        processedTurns.push(res.compressed)
-        compressedTurns++
-        if (!firstCompressedTurnSample) {
-          firstCompressedTurnSample = res.dropped[0]?.sample || turn.text.slice(0, 100).replace(/\n/g, ' ')
-        }
-      } else {
-        keptTurns++
-        processedTurns.push(turn.text)
-      }
+      keptTurns++
     }
   }
 

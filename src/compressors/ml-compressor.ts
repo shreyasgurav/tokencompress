@@ -1,5 +1,6 @@
 import { pipeline, env } from '@xenova/transformers'
 import path from 'path'
+import os from 'os'
 import { fileURLToPath } from 'url'
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
 import { countTokens } from '../tokens/counter.js'
@@ -32,7 +33,7 @@ async function getPipeline() {
             const patched = async function(modelPathOrBuffer: any, options: any) {
               const customOptions = {
                 ...options,
-                intraOpNumThreads: 4, // limit to 4 threads to prevent overheating and context-switching overhead
+                intraOpNumThreads: Math.max(2, Math.min(os.cpus().length, 8)), // auto-detect cores, cap at 8
                 interOpNumThreads: 1
               }
               return originalCreate.call(ortModule.InferenceSession, modelPathOrBuffer, customOptions)
@@ -48,9 +49,10 @@ async function getPipeline() {
       console.log('Loading ML model from:', env.localModelPath)
       // Point to the root model folder (where tokenizer.json lives)
       // transformers.js will automatically look in the 'onnx/' subfolder for model.onnx
-      return await pipeline('text-classification', 'tokencompress-base', {
+      // tokencompress-minilm = MiniLM-L6 fine-tuned + INT8 quantized (22MB, ~15x faster than RoBERTa)
+      return await pipeline('text-classification', 'tokencompress-minilm', {
         local_files_only: true,
-        quantized: true, // Use the dynamically quantized model
+        quantized: true, // Use the dynamically quantized model (model_quantized.onnx)
       })
     })()
   }
@@ -145,8 +147,8 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
 
   // Determine thresholds for Auto-Keep and Auto-Drop
   const sortedScores = [...tfidfScores].sort((a, b) => a - b)
-  const p30 = sortedScores[Math.floor(N * 0.3)] || 0
-  const p90 = sortedScores[Math.floor(N * 0.9)] || 0
+  const p40 = sortedScores[Math.floor(N * 0.4)] || 0
+  const p85 = sortedScores[Math.floor(N * 0.85)] || 0
 
   const autoKeep = new Set<number>()
   const autoDrop = new Set<number>()
@@ -177,9 +179,9 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
 
     if (i === 0 || i === N - 1 || isSpeakerTag) {
       autoKeep.add(s.index)
-    } else if (score >= p90) {
+    } else if (score >= p85) {
       autoKeep.add(s.index)
-    } else if (score <= p30 && !hasSignal && s.text.length < 200) {
+    } else if (score <= p40 && !hasSignal && s.text.length < 200) {
       autoDrop.add(s.index)
     } else {
       ambiguous.push(s)
@@ -190,9 +192,13 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
   // Store probabilities instead of immediately keeping
   const ambiguousWithProb: { s: Pick<Sentence, 'index' | 'text' | 'trailing'>; prob: number }[] = []
   
+  // Build O(1) lookup map for sentence indices (avoids O(N²) findIndex in batch loop)
+  const indexMap = new Map<number, number>()
+  for (let i = 0; i < raw.length; i++) indexMap.set(raw[i].index, i)
+
   if (ambiguous.length > 0) {
     const classifier = await getPipeline()
-    const batchSize = 16
+    const batchSize = 64
     
     for (let i = 0; i < ambiguous.length; i += batchSize) {
       if (opts.signal?.aborted) {
@@ -201,11 +207,11 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
       
       const chunk = ambiguous.slice(i, i + batchSize)
       const inputStrings = chunk.map((s) => {
-        const globalIdx = raw.findIndex((rs) => rs.index === s.index)
+        const globalIdx = indexMap.get(s.index)!
         const prev = globalIdx > 0 ? raw[globalIdx - 1].text : ''
         const next = globalIdx < raw.length - 1 ? raw[globalIdx + 1].text : ''
         const context = `${prev} ${s.text} ${next}`.trim()
-        return `[SENTENCE] ${s.text} [CONTEXT] ${context}`.slice(0, 1500)
+        return `[SENTENCE] ${s.text} [CONTEXT] ${context}`.slice(0, 500)
       })
 
       const outputs = await classifier(inputStrings)
@@ -270,7 +276,7 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
   return {
     compressed,
     dropped,
-    transforms: [`ml:roberta(${raw.length}sentences->${kept.length}sentences)`],
+    transforms: [`ml:minilm(${raw.length}sentences->${kept.length}sentences)`],
     metrics: { sentenceCount: raw.length },
   }
 }

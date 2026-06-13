@@ -106,8 +106,7 @@ export async function compressAsAsync(
     const output = await ASYNC_COMPRESSORS[contentType](text, opts)
     return buildResult(text, contentType, confidence, output, opts)
   } catch (err: any) {
-    console.error(`Async compression failed for ${contentType}:`, err)
-    import('fs').then(fs => fs.writeFileSync('/tmp/error_log.txt', err.stack || String(err)))
+    console.error(`Async compression failed for ${contentType}:`, err?.message || err)
     return failOpenResult(text, contentType, confidence, opts)
   }
 }
