@@ -113,6 +113,7 @@ export function hasImportanceSignal(text: string): boolean {
   // Only boost for meaningful numeric data: prices, percentages, versions,
   // measurements with units, error codes — NOT plain ordinals like "Step 1"
   if (/[$₹€£¥]\s*[\d,.]+|\d+(\.\d+)?%|\bv?\d+\.\d+(\.\d+)?\b/.test(text)) return true
+  if (/\b\d+(\.\d+)?\s*(kg|lbs|kcal|g|mg|cm|mm|reps|sets|sec|min|hrs?|km|m)\b/i.test(text)) return true
   if (/\b\d{3,}\b/.test(text)) return true // 3+ digit numbers (prices, codes, IDs)
   if (/\?/.test(text)) return true // questions are usually important
   if (IMPORTANCE_WORDS.test(text)) return true // decisions / errors / warnings

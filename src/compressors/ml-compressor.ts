@@ -154,6 +154,8 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
   const autoDrop = new Set<number>()
   const ambiguous: typeof raw = []
 
+  let inBullet = false;
+
   for (let i = 0; i < N; i++) {
     const s = raw[i]
     const score = tfidfScores[i]
@@ -177,7 +179,14 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
       // NOT sub-headers (###, ####) which are often decorative inside AI responses.
       /^#{1,2}\s/.test(text);
 
-    if (i === 0 || i === N - 1 || isSpeakerTag) {
+    const isMarkdownListStart = /^[-*+]\s/.test(text) || /^\d+\.\s/.test(text);
+    if (isMarkdownListStart) {
+      inBullet = true;
+    } else if (i > 0 && raw[i - 1].trailing.includes('\n\n')) {
+      inBullet = false;
+    }
+
+    if (i === 0 || i === N - 1 || isSpeakerTag || inBullet) {
       autoKeep.add(s.index)
     } else if (score >= p85) {
       autoKeep.add(s.index)
