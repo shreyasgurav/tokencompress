@@ -8,8 +8,8 @@
  */
 import type { ContentType, DetectionResult } from '../types.js'
 
-/** filename:linenum:content — ripgrep/grep output (also matches Windows C:\ paths). */
-const SEARCH_LINE = /^[^\s:]+:\d+:/
+/** filename:linenum:content — ripgrep/grep output. Ensure we don't match ISO timestamps by checking it doesn't look like a date. */
+const SEARCH_LINE = /^(?!\d{4}-\d{2}-\d{2}T)[^\s:]+:\d+:/
 /** Git diff structural markers. */
 const DIFF_MARKERS = [/^diff --git /m, /^--- a\//m, /^\+\+\+ b\//m, /^@@ /m]
 /** Log level keywords or HH:MM:SS timestamps. */
@@ -120,17 +120,17 @@ export function detectContent(text: string): DetectionResult {
     return { type: 'conversation', confidence, metadata: { speakers: Array.from(speakers) } }
   }
 
-  // 6. Search results — >30% of the first 30 lines look like file:line: matches.
+  // 6. Logs — >30% of the first 50 lines carry a log level or timestamp.
+  const logFrac = fractionMatching(first50, (l) => LOG_PATTERN.test(l))
+  if (logFrac > 0.3) {
+    return { type: 'logs', confidence: Math.min(1, 0.4 + logFrac * 0.6), metadata: {} }
+  }
+
+  // 7. Search results — >30% of the first 30 lines look like file:line: matches.
   const first30 = lines.slice(0, 30)
   const searchFrac = fractionMatching(first30, (l) => SEARCH_LINE.test(l.trim()))
   if (searchFrac > 0.3) {
     return { type: 'search', confidence: Math.min(1, 0.4 + searchFrac * 0.6), metadata: {} }
-  }
-
-  // 7. Logs — >30% of the first 50 lines carry a log level or timestamp.
-  const logFrac = fractionMatching(first50, (l) => LOG_PATTERN.test(l))
-  if (logFrac > 0.3) {
-    return { type: 'logs', confidence: Math.min(1, 0.4 + logFrac * 0.6), metadata: {} }
   }
 
   // 8. Code — >20% of non-empty lines start with a code keyword.

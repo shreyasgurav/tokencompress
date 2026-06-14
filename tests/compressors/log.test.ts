@@ -28,7 +28,7 @@ describe('log compressor', () => {
     expect(r.dropped.length).toBeGreaterThan(0)
     const totalDropped = r.dropped.reduce((n, d) => n + d.count, 0)
     expect(totalDropped).toBeGreaterThan(0)
-    expect(r.compressed).toContain('repeated lines omitted')
+    expect(r.compressed).toMatch(/\[COUNT=\d+\]/)
   })
 
   it('always keeps ERROR lines', () => {

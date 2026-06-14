@@ -16,8 +16,16 @@ const TAIL_LINES = 5
 const HIGH = /\b(error|fatal|critical|exception|traceback|fail)\b/i
 const MED = /\b(warn|warning)\b/i
 
+const HIGH_MAX_PER_PATTERN = 5
 const MED_MAX_PER_PATTERN = 2
 const LOW_MAX_PER_PATTERN = 1
+
+interface PatternStats {
+  level: 'HIGH' | 'MED' | 'LOW'
+  totalCount: number
+  lastKeptIndex: number
+  sample: string
+}
 
 /**
  * Normalize a log line into a dedup key by stripping the volatile parts:
@@ -30,7 +38,11 @@ function normalizeKey(line: string): string {
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<UUID>')
     .replace(/0x[0-9a-fA-F]+/g, '<HEX>')
     .replace(/\b[0-9a-f]{7,}\b/gi, '<HASH>')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '<IP>')
+    .replace(/\b(?:req(?:uest)?_id|user_id|session_id|trace_id|client_id|tx_id)=?[^\s"]+/gi, '<ID>')
+    .replace(/\b(?:status|code|error_code)=?\s*(\d+)\b/gi, '___STATUS_$1___')
     .replace(/\d+/g, '<N>')
+    .replace(/___STATUS_(\d+)___/g, 'status=$1')
     .trim()
 }
 
@@ -45,36 +57,41 @@ export function compressLogs(text: string, _opts: ResolvedOptions): CompressorOu
   const tail = lines.slice(lines.length - TAIL_LINES)
   const body = lines.slice(HEAD_LINES, lines.length - TAIL_LINES)
 
-  const seen = new Map<string, number>()
+  const patterns = new Map<string, PatternStats>()
   const kept: string[] = []
 
-  let highKept = 0
+  let highDropped = 0
   let medDropped = 0
   let lowDropped = 0
+  let highSample: string | undefined
   let medSample: string | undefined
   let lowSample: string | undefined
 
   for (const line of body) {
     const key = normalizeKey(line)
-    const count = seen.get(key) ?? 0
-
-    if (HIGH.test(line)) {
-      // Always keep errors — no dedup.
+    let stats = patterns.get(key)
+    if (!stats) {
+      let level: 'HIGH' | 'MED' | 'LOW' = 'LOW'
+      if (HIGH.test(line)) level = 'HIGH'
+      else if (MED.test(line)) level = 'MED'
+      
+      stats = { level, totalCount: 0, lastKeptIndex: -1, sample: line }
+      patterns.set(key, stats)
+    }
+    
+    stats.totalCount++
+    
+    const limit = stats.level === 'HIGH' ? HIGH_MAX_PER_PATTERN : (stats.level === 'MED' ? MED_MAX_PER_PATTERN : LOW_MAX_PER_PATTERN)
+    if (stats.totalCount <= limit) {
       kept.push(line)
-      seen.set(key, count + 1)
-      highKept++
-    } else if (MED.test(line)) {
-      if (count < MED_MAX_PER_PATTERN) {
-        kept.push(line)
-        seen.set(key, count + 1)
-      } else {
+      stats.lastKeptIndex = kept.length - 1
+    } else {
+      if (stats.level === 'HIGH') {
+        highDropped++
+        if (!highSample) highSample = sample(line)
+      } else if (stats.level === 'MED') {
         medDropped++
         if (!medSample) medSample = sample(line)
-      }
-    } else {
-      if (count < LOW_MAX_PER_PATTERN) {
-        kept.push(line)
-        seen.set(key, count + 1)
       } else {
         lowDropped++
         if (!lowSample) lowSample = sample(line)
@@ -82,19 +99,29 @@ export function compressLogs(text: string, _opts: ResolvedOptions): CompressorOu
     }
   }
 
-  const totalDropped = medDropped + lowDropped
-  const out: string[] = [...head]
-  if (totalDropped > 0) {
-    out.push(`[... ${totalDropped} repeated lines omitted ...]`)
+  const insertions = new Map<number, string>()
+  for (const stats of patterns.values()) {
+    const limit = stats.level === 'HIGH' ? HIGH_MAX_PER_PATTERN : (stats.level === 'MED' ? MED_MAX_PER_PATTERN : LOW_MAX_PER_PATTERN)
+    if (stats.totalCount > limit && stats.lastKeptIndex !== -1) {
+      insertions.set(stats.lastKeptIndex, `[COUNT=${stats.totalCount}]`)
+    }
   }
-  out.push(...kept, ...tail)
+
+  const out: string[] = [...head]
+  for (let i = 0; i < kept.length; i++) {
+    out.push(kept[i])
+    if (insertions.has(i)) {
+      out.push(insertions.get(i)!)
+    }
+  }
+  out.push(...tail)
 
   const dropped: DroppedItem[] = []
-  if (lowDropped > 0) {
+  if (highDropped > 0) {
     dropped.push({
-      reason: 'repeated INFO/DEBUG lines (kept 1 of each unique pattern)',
-      count: lowDropped,
-      sample: lowSample,
+      reason: 'repeated ERROR/FATAL lines (kept 5 of each unique pattern)',
+      count: highDropped,
+      sample: highSample,
     })
   }
   if (medDropped > 0) {
@@ -104,8 +131,14 @@ export function compressLogs(text: string, _opts: ResolvedOptions): CompressorOu
       sample: medSample,
     })
   }
+  if (lowDropped > 0) {
+    dropped.push({
+      reason: 'repeated INFO/DEBUG lines (kept 1 of each unique pattern)',
+      count: lowDropped,
+      sample: lowSample,
+    })
+  }
 
-  void highKept
   return {
     compressed: out.join('\n'),
     dropped,
