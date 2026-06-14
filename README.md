@@ -12,11 +12,11 @@ npm install tokencompress
 
 | Tool output type | Before | After | Reduction |
 |------------------|--------|-------|-----------|
-| Database query   | 8,420  | 890   | 89%       |
-| Codebase search  | 12,300 | 2,100 | 83%       |
-| Server logs      | 15,600 | 1,800 | 88%       |
-| Git diff         | 4,200  | 1,400 | 67%       |
-| Web page         | 9,800  | 1,200 | 88%       |
+| Database query   | 42,502 | 16,866 | 60%       |
+| Codebase search  | 25,500 | 1,330  | 95%       |
+| Server logs      | 17,024 | 373    | 98%       |
+| Git diff         | 1,564  | 119    | 92%       |
+| Web page         | 3,712  | 900    | 76%       |
 
 ---
 
