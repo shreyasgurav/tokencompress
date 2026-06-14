@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { compress } from '../../src/compress.js'
-import { detectContent } from '../../src/detector/content-detector.js'
+import { detectContent } from '../../src/engine/detector.js'
 
 const SMOKE_INPUTS: Array<{ label: string; text: string }> = [
   {

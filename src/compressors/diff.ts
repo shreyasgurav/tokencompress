@@ -6,7 +6,7 @@
  * removed lines, but cap consecutive unchanged context at 3 lines per run.
  */
 import type { CompressorOutput, ResolvedOptions } from '../types.js'
-import { sample } from './shared.js'
+import { sample } from '../engine/utils.js'
 
 const MIN_LINES = 20
 const MAX_CONTEXT_RUN = 3

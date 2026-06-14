@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectContent } from '../src/detector/content-detector.js'
+import { detectContent } from '../src/engine/detector.js'
 
 describe('detectContent', () => {
   it('returns full confidence for valid JSON', () => {

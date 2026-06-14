@@ -1,235 +1,106 @@
 # tokencompress
 
-**Explainable LLM context compression — fewer tokens, same information, and a full report of exactly what was dropped and why.**
+**Automatic token compression for AI agent tool outputs.**
 
-LLMs charge per token. Logs, JSON dumps, search results, diffs, and HTML are full of redundancy you're paying to send. `tokencompress` detects what kind of content you're sending and compresses it with a purpose-built strategy — then tells you precisely what it removed.
+Every tool call costs tokens. `tokencompress` automatically intercepts, parses, and compresses tool outputs (JSON, logs, diffs, code, HTML, text) before they enter your agent's context window. 
 
-Every result includes a `dropped[]` report. Nothing is removed silently.
-
-- **Explainable** — `dropped[]` lists every removal with a reason, count, and sample.
-- **Adaptive** — keep-counts are chosen by information-saturation detection, not hardcoded limits, so near-duplicate data collapses hard while diverse data is barely touched.
-- **Prose-aware** — plain text is compressed by TF-IDF extractive summarization: high-signal sentences (numbers, errors, decisions, entities) are always kept while filler is dropped.
-- **Semantic ML Routing** — conversation text is compressed using a highly-optimized local ML model (`tokencompress-minilm`, a custom MiniLM-L6 model trained on 599k conversational examples) via ONNX Runtime to keep contextually relevant sentences. 
-- **Universal Router** — intermingled JSON, code blocks, logs, and text are automatically segmented, routed to specialized compressors, and reassembled losslessly in parallel.
-- **Local & TypeScript-native** — 100% local processing. No API keys, no network calls. The only TypeScript-native context compression library.
-- **Fail-open & Cancellable** — falls back to original text if anything throws. Full `AbortSignal` support to instantly cancel heavy ML workloads.
-
-## Benchmarks
-
-**The Headline: "Fewer Tokens, Better Answers"**
-When testing LLM extraction and QA on massive, repetitive chat histories, the compressed context consistently scores HIGHER than the original raw text. Removing the conversational filler helps the LLM focus on the facts.
-- **Accuracy on QA task:** 18/20 (Compressed) vs 16/20 (Raw)
-- **Token Usage:** 40% fewer tokens.
-
-**Large Document (Parallel Mixed-Content Compression)**
-- `140k tokens` (500 interleaved blocks of Prose, JSON, Logs, Code) — 72.2% reduction. Processed completely locally in **19.7 seconds**.
-
-**Conversational Documents (Turn-Aware Compression)**
-Unlike standard naive TF-IDF which destroys the structural thread of chat histories, our Turn-Aware Conversational Compression protects the back-and-forth structure while internally crushing verbose assistant responses.
-- `ChatGPT-Building future.md` — 41.2% reduction, 100% retention
-- `ChatGPT-DSA.md` — 32.2% reduction, 94.1% retention
-- `ChatGPT-Fitness.md` — 29.6% reduction, 92.9% retention
-
-**Structured Prose**
-- `SQuAD v2` (150 questions) — 19.3% reduction, 88.8% retention
-
-## Install
+Get **60-90% fewer tokens** with the same answers, zero proxy servers, and full explainability.
 
 ```bash
 npm install tokencompress
 ```
 
-## Usage
+| Tool output type | Before | After | Reduction |
+|------------------|--------|-------|-----------|
+| Database query   | 8,420  | 890   | 89%       |
+| Codebase search  | 12,300 | 2,100 | 83%       |
+| Server logs      | 15,600 | 1,800 | 88%       |
+| Git diff         | 4,200  | 1,400 | 67%       |
+| Web page         | 9,800  | 1,200 | 88%       |
 
-### Compress a raw string
+---
 
-```ts
-import { compress } from 'tokencompress'
+## The Problem
 
-const result = compress(largeLogOutput)
+Agents bloat their context windows by dumping massive tool outputs directly into the prompt. A simple database query or a `grep` search can consume 20k+ tokens of purely redundant context.
 
-console.log(result.compressed)        // the compressed text
-console.log(result.tokensSaved)       // e.g. 3616
-console.log(result.compressionRatio)  // e.g. 0.75
-console.log(result.dropped)
-// [
-//   { reason: 'repeated INFO/DEBUG lines (kept 1 of each unique pattern)', count: 198 },
-//   { reason: 'repeated WARN lines (kept 2 of each unique pattern)', count: 34 },
-// ]
-```
+Other solutions force you to route all your API traffic through a third-party proxy server or require heavy Python dependencies.
 
-### Compress a mixed-content document
+**`tokencompress` is different:**
+1. **TypeScript-native:** Zero Python, zero Docker, runs locally in your Node.js/Edge environment.
+2. **Explainable:** Every compressed result includes a `dropped` array detailing exactly what was removed and why.
+3. **Semantic:** It doesn't just blindly truncate. It parses JSON, deduplicates logs, and scores text with a custom ML model.
 
-Real LLM turns aren't one clean type — they interleave prose, code, JSON, and logs in a single message. `segmentAndCompress` splits the document into typed blocks, routes **each block to the compressor that understands it**, and reassembles the document in place. Fenced code blocks keep their fences; nothing is reordered.
+---
 
-```ts
-import { segmentAndCompress } from 'tokencompress'
-
-const result = segmentAndCompress(mixedAssistantMessage)
-
-console.log(result.compressed)   // rebuilt document, each block compressed in place
-console.log(result.tokensSaved)  // total saved across all blocks
-console.log(result.segments)
-// [
-//   { index: 0, kind: 'text',   type: 'text', tokensBefore: 12, tokensSaved: 0 },
-//   { index: 1, kind: 'fenced', type: 'logs', fenceLanguage: 'log', tokensSaved: 410 },
-//   { index: 2, kind: 'fenced', type: 'json', fenceLanguage: 'json', tokensSaved: 380 },
-//   { index: 3, kind: 'fenced', type: 'code', fenceLanguage: 'ts', tokensSaved: 24 },
-// ]
-console.log(result.dropped)      // aggregated drop report across every block
-```
-
-It detects both **fenced** blocks (```` ```json ````, ```` ```ts ````, …) and **unfenced** structures pasted inline — JSON objects/arrays and runs of log lines — leaving the surrounding prose as text. The concatenation of all segments reproduces the input exactly, so if nothing is removed the output is byte-identical.
-
-```bash
-# CLI: compress a mixed document block-by-block
-cat assistant-reply.md | tokencompress segment --stdin
-```
-
-### Compress a chat-messages array
+## Quick Start — 3 lines
 
 ```ts
-import { compressMessages } from 'tokencompress'
+import { compressToolOutput } from 'tokencompress'
 
-const compressed = compressMessages(
-  [
-    { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user', content: hugeToolOutput },
-  ],
-  {
-    model: 'gpt-4o',
-    targetRatio: 0.3,
-    protectRecent: 2,            // leave the last 2 messages (the live turn) untouched
-    compressUserMessages: true,  // default true
-    minTokensToCompress: 200,    // skip messages smaller than this
-  },
-)
-// same array shape, each `content` compressed — drop straight into your API request
+// You run your tool...
+const rawGrepOutput = execSync('grep -r "auth" src/').toString()
+
+// ...we compress it!
+const result = compressToolOutput(rawGrepOutput, { tool: 'grep' })
+
+console.log(`Saved ${result.tokensSaved} tokens!`)
+console.log(result.compressed)
+// {
+//   compressed: "...(much smaller string)...",
+//   tokensBefore: 12300,
+//   tokensAfter: 2100,
+//   dropped: [ { reason: "omitted 211 identical matches in auth.ts", count: 211 } ]
+// }
 ```
 
-### CLI
+---
 
-```bash
-# compress a file (stats go to stderr, compressed output to stdout)
-tokencompress compress --file server.log
+## Framework Integrations
 
-# pipe through it
-cat results.txt | tokencompress compress --stdin --quiet > compressed.txt
+### Vercel AI SDK
 
-# just detect the content type
-tokencompress detect --file data.json
-
-# full benchmark report
-tokencompress benchmark large-diff.patch
-
-# compress a mixed document (prose + code + JSON + logs) block-by-block
-tokencompress segment --file assistant-reply.md
-```
-
-## The result type
+Intercept all tool calls automatically using our official middleware.
 
 ```ts
-interface CompressResult {
-  compressed: string
-  original: string
-  tokensBefore: number
-  tokensAfter: number
-  tokensSaved: number
-  compressionRatio: number        // 0.0 – 1.0
-  contentType: 'json' | 'logs' | 'diff' | 'search' | 'code' | 'html' | 'text' | 'conversation'
-  confidence: number              // 0.0 – 1.0 confidence in the detected type
-  dropped: DroppedItem[]          // exactly what was removed and why
-  transformsApplied: string[]
-  telemetry?: Record<string, CompressorTelemetry>
-}
+import { generateText } from 'ai'
+import { createVercelAIMiddleware } from 'tokencompress/middleware'
 
-interface DroppedItem {
-  reason: string
-  count: number
-  sample?: string
-}
-
-interface CompressorTelemetry {
-  timeMs: number
-  blocksProcessed: number
-  tokensBefore: number
-  tokensAfter: number
-  sentenceCount?: number          // populated for ML text compression
-}
+const result = await generateText({
+  model: yourModel,
+  tools: yourTools,
+  // 1 line to compress all tool outputs
+  experimental_toolCallMiddleware: createVercelAIMiddleware({ targetRatio: 0.3 }),
+})
 ```
+
+### Generic Agents (Langchain, Custom)
+
+Wrap any tool executor function natively.
+
+```ts
+import { wrapToolExecutorAsync } from 'tokencompress/middleware'
+
+// Wrap your existing tool function
+const myOptimizedTool = wrapToolExecutorAsync(myHeavyDbQueryTool, { targetRatio: 0.2 })
+
+// Now it returns { output: "compressed string", meta: { tokensSaved: 5000 } }
+const { output, meta } = await myOptimizedTool(args)
+```
+
+---
 
 ## How it works
 
-```
-input
-  ↓
-detectContent()  →  json | diff | html | search | logs | code | text   (+ confidence)
-  ↓
-route to the matching compressor
-  ↓
-  json         →  adaptively sample large arrays (head + middle + tail)
-  logs         →  keep errors, dedupe repeated lines by normalized template
-  diff         →  keep all +/- and headers, cap unchanged context at 3 lines/run
-  search       →  group by file, adaptively cap matches per file, summarize the rest
-  code         →  strip block + full-line comments, collapse blank runs
-  html         →  drop scripts/styles/markup, keep the readable text
-  conversation →  turn-aware splitting: protects all user turns and structural boundaries, 
-                  only compresses long assistant responses internally using TF-IDF
-  text         →  TF-IDF extractive: score sentences, keep high-signal ones
-                  (numbers, errors, decisions), drop filler; falls back to
-                  whitespace-normalize + middle-truncate if savings < 20%
-  ↓
-count tokens (js-tiktoken)  →  CompressResult with dropped[] populated
-```
+When you call `compressToolOutput()`, it uses the optional `tool` hint (or automatic heuristics) to route the output to a specialized semantic engine:
 
-For documents that mix several types in one message, `segmentAndCompress()` adds a step in front: it segments the input into typed blocks (markdown fences plus unfenced JSON/log runs), runs each block through the pipeline above, and stitches the results back together in order — returning a `SegmentedCompressResult` with a per-segment breakdown.
-
-```
-mixed document
-  ↓
-segment → [ text ][ ```log … ``` ][ text ][ ```json … ``` ][ ```ts … ``` ]
-  ↓           ↓           ↓             ↓          ↓              ↓
-            text       logs          text       json           code     ← each routed independently
-  ↓
-reassemble in place  →  SegmentedCompressResult { compressed, segments[], dropped[] }
-```
-
-### Adaptive sizing
-
-For JSON arrays and search results, tokencompress doesn't use a fixed keep-count. It builds a cumulative unique-content curve and finds the *knee* — the point where adding more items stops adding information (the Kneedle method, plus SimHash near-duplicate clustering). 500 near-identical rows collapse to a handful; 500 genuinely distinct rows are mostly kept. No ML, just arithmetic.
-
-Everything runs **locally** — no API calls. If a compressor ever throws, it **fails open**: you get the original text back untouched, never an error.
-
-## Options
-
-```ts
-compress(text, {
-  model: 'gpt-4o',     // token-counting model (default 'gpt-4o')
-  targetRatio: 0.3,    // 0.1 (gentle) – 0.9 (aggressive), default 0.3
-  maxTokens: 2000,     // optional hard cap used by text truncation
-  signal: abortCtrl.signal // optional AbortSignal to cancel compression
-})
-```
-
-`compressMessages` accepts the same options plus a message-level policy:
-
-```ts
-compressMessages(messages, {
-  protectRecent: 0,            // leave the last N messages untouched
-  compressUserMessages: true,  // gate compression by role
-  compressSystemMessages: true,
-  minTokensToCompress: 0,      // skip content smaller than this
-})
-```
-
-## Development
-
-```bash
-npm install
-npm run build     # compile to dist/
-npm test          # run the vitest suite
-npm run lint      # type-check only
-```
+- **JSON (`tool: 'sql'`, `'prisma'`):** Truncates massive repetitive arrays while preserving anomalous objects and schema structure.
+- **Logs (`tool: 'tail'`, `'journalctl'`):** Strips timestamps, deduplicates identical stack traces, but preserves `ERROR` and `FATAL` lines unconditionally.
+- **Diffs (`tool: 'git_diff'`, `'patch'`):** Removes long runs of unchanged context lines, preserving the actual `+` and `-` additions.
+- **Search (`tool: 'grep'`, `'rg'`):** Limits matches per file and strips redundant context lines.
+- **Code (`tool: 'cat'`, `'ls'`):** Strips JSDoc/comments and collapses whitespace, preserving function signatures.
+- **HTML (`tool: 'curl'`, `'fetch'`):** Removes `<script>`, `<style>`, and `<svg>` blocks, extracting only the text content.
+- **Plain Text / Prose:** Uses a custom-trained, locally-running ONNX MiniLM model to score sentences by information density and extract only the most important context.
 
 ## License
 

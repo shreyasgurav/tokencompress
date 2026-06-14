@@ -7,7 +7,7 @@
  * report how many lines were dropped at each priority level.
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { sample } from './shared.js'
+import { sample } from '../engine/utils.js'
 
 const MIN_LINES = 10
 const HEAD_LINES = 5

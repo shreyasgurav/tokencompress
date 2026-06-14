@@ -8,7 +8,7 @@
  *      keep the first 60% and last 20% of lines and replace the middle.
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { countTokens } from '../tokens/counter.js'
+import { countTokens } from '../engine/counter.js'
 
 const TRUNCATE_TRIGGER_RATIO = 1.5
 

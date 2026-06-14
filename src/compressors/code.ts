@@ -8,7 +8,7 @@
  * collapse function bodies — too risky for correctness.
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { sample } from './shared.js'
+import { sample } from '../engine/utils.js'
 
 /** Count newlines inside a string region. */
 function countLines(s: string): number {

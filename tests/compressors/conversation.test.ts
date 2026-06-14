@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compressConversation } from '../../src/compressors/conversation-compressor.js'
+import { compressConversation } from '../../src/compressors/conversation.js'
 import { resolveOptions } from '../../src/types.js'
 
 describe('conversation compressor', () => {

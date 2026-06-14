@@ -1,7 +1,7 @@
 import type { ResolvedOptions, CompressorOutput, DroppedItem } from '../types.js'
-import { countTokens } from '../tokens/counter.js'
-import { compressTfidf } from './tfidf-compressor.js'
-import { compressML } from './ml-compressor.js'
+import { countTokens } from '../engine/counter.js'
+import { compressTfidf } from '../engine/tfidf.js'
+import { compressML } from './ml.js'
 
 const SPEAKER_PATTERN = /^(?:\*\*([A-Z][a-zA-Z]+)\*\*(?::\s|\s*$)|([A-Z][a-zA-Z]+):\s|##\s*([A-Z][a-zA-Z]+):(?:\s|$))/i
 const USER_SPEAKER_PATTERN = /^(?:\*\*?)?(User|You|Human|Client|Customer)(?:\*\*?)?(?::\s|\s*$)|##\s*(Prompt|User|Human):(?:\s|$)/i
@@ -15,6 +15,10 @@ interface Turn {
 /**
  * Compresses conversational text by parsing it into turns, preserving all turns,
  * and internally squeezing long Assistant/AI responses using TF-IDF.
+ *
+ * NOTE: This sync version uses TF-IDF for inner-turn compression because the
+ * ONNX ML model requires async inference. For higher-quality ML-based
+ * compression, use {@link compressConversationAsync} instead.
  */
 export function compressConversation(text: string, opts: ResolvedOptions): CompressorOutput {
   const lines = text.split('\n')

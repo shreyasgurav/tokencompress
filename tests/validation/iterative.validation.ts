@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { compressIterative } from '../../src/compressors/iterative-compressor.js'
+import { compressIterative } from '../../src/engine/iterative.js'
 import { resolveOptions } from '../../src/types.js'
-import { countTokens } from '../../src/tokens/counter.js'
+import { countTokens } from '../../src/engine/counter.js'
 
 describe('Iterative compressor — validation', () => {
   it('stops if maxPasses is reached or improvement is below threshold', () => {

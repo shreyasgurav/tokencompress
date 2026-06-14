@@ -243,3 +243,13 @@ export function resolveOptions(options?: CompressOptions): ResolvedOptions {
     },
   }
 }
+
+/** Options specifically for compressing an agent tool output. */
+export interface ToolOutputOptions extends CompressOptions {
+  /** 
+   * Optional hint about which tool produced this output (e.g. 'grep', 'sql', 'curl'). 
+   * If provided, tokencompress will skip heuristic detection and use the exact compressor 
+   * suited for this tool's output format.
+   */
+  tool?: string
+}

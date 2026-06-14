@@ -16,8 +16,8 @@
  * Pure TypeScript, zero dependencies, fully deterministic.
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { countTokens } from '../tokens/counter.js'
-import { sample } from './shared.js'
+import { countTokens } from './counter.js'
+import { sample } from './utils.js'
 
 /** Below this many sentences, prose is too short to compress meaningfully. */
 const MIN_SENTENCES = 4

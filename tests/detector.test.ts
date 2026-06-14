@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectType } from '../src/detector/content-detector.js'
+import { detectType } from '../src/engine/detector.js'
 
 describe('detectType', () => {
   it('detects JSON arrays and objects', () => {

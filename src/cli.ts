@@ -11,11 +11,11 @@
  */
 import { readFileSync } from 'node:fs'
 import { Command } from 'commander'
-import { segmentAndCompress, segmentAndCompressAsync } from './router/universal-router.js'
-import { detectContent } from './detector/content-detector.js'
+import { segmentAndCompress, segmentAndCompressAsync } from './engine/router.js'
+import { detectContent } from './engine/detector.js'
 import type { SegmentedCompressResult } from './types.js'
 
-const VERSION = '0.3.0'
+const VERSION = '2.0.0'
 
 function readStdin(): Promise<string> {
   return new Promise((resolve) => {

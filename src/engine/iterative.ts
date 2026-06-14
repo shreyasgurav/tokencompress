@@ -1,6 +1,6 @@
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { countTokens } from '../tokens/counter.js'
-import { compressTfidf } from './tfidf-compressor.js'
+import { countTokens } from './counter.js'
+import { compressTfidf } from './tfidf.js'
 
 export function compressIterative(text: string, opts: ResolvedOptions): CompressorOutput {
   if (!opts.iterative.enabled) {

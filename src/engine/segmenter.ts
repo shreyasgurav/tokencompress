@@ -17,7 +17,7 @@
  * Everything else is prose, routed to the text compressor.
  */
 import type { ContentType, SegmentKind } from '../types.js'
-import { detectContent } from '../detector/content-detector.js'
+import { detectContent } from './detector.js'
 
 /** A segment before compression. `fenceOpen + inner + fenceClose === raw`. */
 export interface RawSegment {

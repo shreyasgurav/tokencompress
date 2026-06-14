@@ -10,8 +10,8 @@
  * drop from a single object.
  */
 import type { CompressorOutput, ResolvedOptions } from '../types.js'
-import { sample } from './shared.js'
-import { computeOptimalK } from '../adaptive/sizer.js'
+import { sample } from '../engine/utils.js'
+import { computeOptimalK } from '../engine/sizer.js'
 
 const MIN_ARRAY_ITEMS = 5
 

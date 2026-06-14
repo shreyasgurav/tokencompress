@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectContent } from '../../src/detector/content-detector.js'
+import { detectContent } from '../../src/engine/detector.js'
 
 function makeJsonArray(): string {
   return JSON.stringify(Array.from({ length: 20 }, (_, i) => ({ id: i, value: i * 2, active: true })))

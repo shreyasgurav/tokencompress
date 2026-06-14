@@ -17,17 +17,17 @@ import type {
   ResolvedOptions,
 } from './types.js'
 import { resolveOptions } from './types.js'
-import { countTokens } from './tokens/counter.js'
-import { compressJson } from './compressors/json-compressor.js'
-import { compressLogs } from './compressors/log-compressor.js'
-import { compressDiff } from './compressors/diff-compressor.js'
-import { compressSearch } from './compressors/search-compressor.js'
-import { compressCode } from './compressors/code-compressor.js'
-import { compressHtml } from './compressors/html-compressor.js'
-import { compressConversation, compressConversationAsync } from './compressors/conversation-compressor.js'
-import { compressText } from './compressors/text-compressor.js'
-import { compressIterative } from './compressors/iterative-compressor.js'
-import { compressML } from './compressors/ml-compressor.js'
+import { countTokens } from './engine/counter.js'
+import { compressJson } from './compressors/json.js'
+import { compressLogs } from './compressors/logs.js'
+import { compressDiff } from './compressors/diff.js'
+import { compressSearch } from './compressors/search.js'
+import { compressCode } from './compressors/code.js'
+import { compressHtml } from './compressors/html.js'
+import { compressConversation, compressConversationAsync } from './compressors/conversation.js'
+import { compressText } from './compressors/text.js'
+import { compressIterative } from './engine/iterative.js'
+import { compressML } from './compressors/ml.js'
 
 type CompressorFn = (text: string, opts: ResolvedOptions) => CompressorOutput
 type AsyncCompressorFn = (text: string, opts: ResolvedOptions) => Promise<CompressorOutput>
@@ -160,7 +160,7 @@ function buildResult(
   }
 }
 
-import { detectContent } from './detector/content-detector.js'
+import { detectContent } from './engine/detector.js'
 
 /**
  * Compress a raw string.

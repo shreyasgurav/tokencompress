@@ -11,6 +11,7 @@
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
 
+
 /** Count newlines in a string region (for reporting dropped "lines"). */
 function countLines(s: string): number {
   if (s.length === 0) return 0

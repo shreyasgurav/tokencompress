@@ -4,7 +4,7 @@ import {
   findKnee,
   uniqueBigramCurve,
   countUnique,
-} from '../src/adaptive/sizer.js'
+} from '../src/engine/sizer.js'
 
 describe('computeOptimalK', () => {
   it('returns all items for trivially small inputs', () => {

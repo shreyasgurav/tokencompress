@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { compressHtml } from '../../src/compressors/html-compressor.js'
+import { compressHtml } from '../../src/compressors/html.js'
 import { DEFAULT_OPTIONS } from '../../src/types.js'
 
 describe('compressHtml', () => {

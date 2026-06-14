@@ -20,9 +20,9 @@ import type {
 } from '../types.js'
 import { resolveOptions } from '../types.js'
 import { compressAs } from '../compress.js'
-import { countTokens } from '../tokens/counter.js'
+import { countTokens } from './counter.js'
 import { segmentDocument } from './segmenter.js'
-import { detectContent } from '../detector/content-detector.js'
+import { detectContent } from './detector.js'
 
 /** Merge dropped items that share a reason, summing counts. */
 function mergeDropped(items: DroppedItem[]): DroppedItem[] {

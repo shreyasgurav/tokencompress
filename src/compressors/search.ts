@@ -6,8 +6,8 @@
  * targetRatio), and replace the remainder with a one-line summary per file.
  */
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { sample } from './shared.js'
-import { computeOptimalK } from '../adaptive/sizer.js'
+import { sample } from '../engine/utils.js'
+import { computeOptimalK } from '../engine/sizer.js'
 
 /** filename:linenum:content — first colon-delimited segment is the file. */
 const SEARCH_LINE = /^([^\s:]+):(\d+):(.*)$/
@@ -25,20 +25,38 @@ export function compressSearch(text: string, opts: ResolvedOptions): CompressorO
   // Preserve insertion order of files.
   const fileOrder: string[] = []
   const perFile = new Map<string, string[]>()
-  const nonResult: string[] = []
 
-  for (const line of lines) {
-    const m = line.trim().match(SEARCH_LINE)
+  // Separate non-result lines into leading (before first result) and trailing
+  // (after last result) so they stay in their original positions.
+  const leadingNonResult: string[] = []
+  const trailingNonResult: string[] = []
+
+  // First pass: find boundaries of search result lines.
+  let firstResultIdx = -1
+  let lastResultIdx = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (SEARCH_LINE.test(lines[i].trim())) {
+      if (firstResultIdx === -1) firstResultIdx = i
+      lastResultIdx = i
+    }
+  }
+
+  // Second pass: classify each line.
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].trim().match(SEARCH_LINE)
     if (m) {
       const file = m[1]
       if (!perFile.has(file)) {
         perFile.set(file, [])
         fileOrder.push(file)
       }
-      perFile.get(file)!.push(line)
-    } else {
-      nonResult.push(line)
+      perFile.get(file)!.push(lines[i])
+    } else if (firstResultIdx === -1 || i < firstResultIdx) {
+      leadingNonResult.push(lines[i])
+    } else if (i > lastResultIdx) {
+      trailingNonResult.push(lines[i])
     }
+    // Non-result lines between results are dropped (usually blank separators)
   }
 
   if (perFile.size === 0) {
@@ -46,8 +64,8 @@ export function compressSearch(text: string, opts: ResolvedOptions): CompressorO
   }
 
   const out: string[] = []
-  // Keep leading non-result lines (headers) — usually few.
-  out.push(...nonResult)
+  // Keep leading non-result lines (headers) at the start.
+  out.push(...leadingNonResult)
 
   const dropped: DroppedItem[] = []
   let totalKept = 0
@@ -75,6 +93,11 @@ export function compressSearch(text: string, opts: ResolvedOptions): CompressorO
         sample: sample(matches[keep.length]),
       })
     }
+  }
+
+  // Append trailing non-result lines (footers) at the end.
+  if (trailingNonResult.length > 0) {
+    out.push(...trailingNonResult)
   }
 
   return {

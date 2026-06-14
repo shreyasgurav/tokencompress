@@ -1,7 +1,7 @@
 {
   "name": "tokencompress",
-  "version": "1.1.1",
-  "description": "Removes redundant tokens from LLM inputs before they hit the model. Shows exactly what was dropped and why.",
+  "version": "2.0.0",
+  "description": "Automatic token compression for AI agent tool outputs. 60-90% fewer tokens, full explainability.",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware/index.d.ts",
+      "import": "./dist/middleware/index.js"
     }
   },
   "bin": {
@@ -49,14 +53,19 @@
   },
   "keywords": [
     "llm",
+    "agent",
+    "tool-output",
     "compression",
     "tokens",
     "context",
-    "ai",
+    "ai-agent",
     "tiktoken",
     "prompt",
     "optimization",
-    "explainable"
+    "explainable",
+    "vercel-ai",
+    "langchain",
+    "mcp"
   ],
   "author": "",
   "license": "MIT",

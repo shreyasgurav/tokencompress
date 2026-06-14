@@ -3,9 +3,9 @@ import path from 'path'
 import os from 'os'
 import { fileURLToPath } from 'url'
 import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
-import { countTokens } from '../tokens/counter.js'
-import { sample } from './shared.js'
-import { contentWords, hasImportanceSignal } from './tfidf-compressor.js'
+import { countTokens } from '../engine/counter.js'
+import { sample } from '../engine/utils.js'
+import { contentWords, hasImportanceSignal } from '../engine/tfidf.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -179,11 +179,15 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
       // NOT sub-headers (###, ####) which are often decorative inside AI responses.
       /^#{1,2}\s/.test(text);
 
+    // Reset bullet state BEFORE checking if current line starts a new list.
+    // A double-newline gap before the current sentence ends the previous list.
+    if (i > 0 && raw[i - 1].trailing.includes('\n\n')) {
+      inBullet = false;
+    }
+
     const isMarkdownListStart = /^[-*+]\s/.test(text) || /^\d+\.\s/.test(text);
     if (isMarkdownListStart) {
       inBullet = true;
-    } else if (i > 0 && raw[i - 1].trailing.includes('\n\n')) {
-      inBullet = false;
     }
 
     if (i === 0 || i === N - 1 || isSpeakerTag || inBullet) {
@@ -207,7 +211,8 @@ export async function compressML(text: string, opts: ResolvedOptions): Promise<C
 
   if (ambiguous.length > 0) {
     const classifier = await getPipeline()
-    const batchSize = 64
+    // batch=1 is 3.3x faster on CPU (ONNX pads every batch to longest sentence)
+    const batchSize = 1
     
     for (let i = 0; i < ambiguous.length; i += batchSize) {
       if (opts.signal?.aborted) {
