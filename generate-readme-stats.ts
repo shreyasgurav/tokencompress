@@ -62,6 +62,39 @@ const html = `
 </html>
 `;
 
+// 6. Code / File contents (JSDoc and Comments to strip)
+const codeFile = `
+/**
+ * This is a massive module-level JSDoc.
+ * It goes on for many lines to explain the file architecture.
+ ${' * And more documentation lines.\n'.repeat(50)}
+ */
+import { something } from 'somewhere';
+
+/**
+ * Function description.
+ ${' * More parameter descriptions and fluff.\n'.repeat(50)}
+ */
+export function myFunc(a: string, b: number) {
+  // Inline comment describing logic
+  // Another inline comment
+  console.log(a, b);
+}
+`.repeat(20);
+
+// 7. Plain text / Prose (Semantic ML compression)
+const plainText = `
+We are thrilled to announce our new update today. The weather is beautiful outside and the birds are singing.
+There are many things we could talk about, but we will focus on the core updates.
+This section contains a lot of fluff that the ML model should ideally rank lower.
+${'It is a sunny day and everyone is very happy to be working on this project. '.repeat(50)}
+The core API endpoint has changed from v1 to v2 and now requires a Bearer token in the Authorization header.
+${'More fluff text about our company culture and how much we love our users. '.repeat(50)}
+If you do not update your API keys by tomorrow, your integration will break.
+${'Thank you for being a valued customer. '.repeat(50)}
+`.repeat(10);
+
+
 console.log('| Tool output type | Before | After | Reduction |');
 console.log('|------------------|--------|-------|-----------|');
 measure('Database query', dbQuery, 'sql');
@@ -69,3 +102,5 @@ measure('Codebase search', searchResult, 'grep');
 measure('Server logs', logs, 'tail');
 measure('Git diff', diff, 'git_diff');
 measure('Web page', html, 'curl');
+measure('Code file', codeFile, 'cat');
+measure('Plain text', plainText, 'read');

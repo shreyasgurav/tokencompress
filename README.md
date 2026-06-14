@@ -17,6 +17,8 @@ npm install tokencompress
 | Server logs      | 17,024 | 373    | 98%       |
 | Git diff         | 1,564  | 119    | 92%       |
 | Web page         | 3,712  | 900    | 76%       |
+| Code file        | 14,541 | 10,315 | 29%       |
+| Plain text / ML  | 20,981 | 10,297 | 51%       |
 
 ---
 
