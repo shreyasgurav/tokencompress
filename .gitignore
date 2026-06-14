@@ -10,6 +10,8 @@ coverage/
 
 # Scratch/temp
 scratch/
+scripts/
+benchmarks/
 
 # Python venv
 .venv/
