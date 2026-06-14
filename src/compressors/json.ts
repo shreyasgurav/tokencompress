@@ -9,44 +9,23 @@
  * Objects are only pretty-printed — we never guess which keys are safe to
  * drop from a single object.
  */
-import type { CompressorOutput, ResolvedOptions } from '../types.js'
+import type { CompressorOutput, DroppedItem, ResolvedOptions } from '../types.js'
 import { sample } from '../engine/utils.js'
 import { computeOptimalK } from '../engine/sizer.js'
 
 const MIN_ARRAY_ITEMS = 5
 
-/** Compress a JSON string that has already been validated as parseable. */
-export function compressJson(text: string, opts: ResolvedOptions): CompressorOutput {
-  let data: unknown
-  try {
-    data = JSON.parse(text.trim())
-  } catch {
-    // Detector said JSON but it doesn't parse — leave it untouched.
-    return { compressed: text, dropped: [], transforms: ['json:passthrough'] }
-  }
+interface CompressionStats {
+  droppedCount: number
+  samples: string[]
+}
 
-  if (!Array.isArray(data)) {
-    // Single object/value: pretty-print only, no semantic compression.
-    return {
-      compressed: JSON.stringify(data, null, 2),
-      dropped: [],
-      transforms: ['json:pretty'],
-    }
-  }
-
+function compressArray(data: unknown[], opts: ResolvedOptions): { array: unknown[]; dropped: number; sample?: string } {
   const original = data.length
   if (original <= MIN_ARRAY_ITEMS) {
-    return {
-      compressed: JSON.stringify(data, null, 2),
-      dropped: [],
-      transforms: ['json:pretty'],
-    }
+    return { array: data, dropped: 0 }
   }
 
-  // targetRatio is "fraction removed"; (1 - targetRatio) is the upper bound on
-  // what we keep. Within that cap, the adaptive sizer decides how many records
-  // are actually distinct enough to keep — a list of 500 near-identical rows
-  // collapses hard, while 500 varied rows are barely touched.
   const keepFraction = Math.max(0.05, 1 - opts.targetRatio)
   const maxKeep = Math.max(MIN_ARRAY_ITEMS, Math.floor(original * keepFraction))
   const bias = 0.7 + (1 - opts.targetRatio) * 0.6
@@ -58,11 +37,7 @@ export function compressJson(text: string, opts: ResolvedOptions): CompressorOut
   })
 
   if (keepCount >= original) {
-    return {
-      compressed: JSON.stringify(data, null, 2),
-      dropped: [],
-      transforms: ['json:pretty'],
-    }
+    return { array: data, dropped: 0 }
   }
 
   const headCount = Math.max(1, Math.floor(keepCount / 2))
@@ -72,7 +47,6 @@ export function compressJson(text: string, opts: ResolvedOptions): CompressorOut
   const head = data.slice(0, headCount)
   const tail = tailCount > 0 ? data.slice(original - tailCount) : []
 
-  // Evenly sample the middle region (between head and tail).
   const middleStart = headCount
   const middleEnd = original - tailCount
   const middleRegion = data.slice(middleStart, middleEnd)
@@ -93,18 +67,64 @@ export function compressJson(text: string, opts: ResolvedOptions): CompressorOut
     result.push({ _tokencompress: `${droppedCount} similar items omitted` })
   }
 
+  return { array: result, dropped: droppedCount, sample: itemStrings[middleStart] }
+}
+
+function traverseAndCompress(obj: unknown, opts: ResolvedOptions, stats: CompressionStats): unknown {
+  if (Array.isArray(obj)) {
+    if (obj.length > MIN_ARRAY_ITEMS) {
+      const { array, dropped, sample } = compressArray(obj, opts)
+      stats.droppedCount += dropped
+      if (sample) stats.samples.push(sample)
+      return array.map(item => traverseAndCompress(item, opts, stats))
+    } else {
+      return obj.map(item => traverseAndCompress(item, opts, stats))
+    }
+  } else if (obj !== null && typeof obj === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(obj)) {
+      result[k] = traverseAndCompress(v, opts, stats)
+    }
+    return result
+  }
+  return obj
+}
+
+/** Compress a JSON string that has already been validated as parseable. */
+export function compressJson(text: string, opts: ResolvedOptions): CompressorOutput {
+  let data: unknown
+  try {
+    data = JSON.parse(text.trim())
+  } catch {
+    // Detector said JSON but it doesn't parse — leave it untouched.
+    return { compressed: text, dropped: [], transforms: ['json:passthrough'] }
+  }
+
+  const stats: CompressionStats = { droppedCount: 0, samples: [] }
+  const result = traverseAndCompress(data, opts, stats)
+
+  if (stats.droppedCount === 0) {
+    return {
+      compressed: JSON.stringify(result, null, 2),
+      dropped: [],
+      transforms: ['json:pretty'],
+    }
+  }
+
+  const dropped: DroppedItem[] = [
+    {
+      reason: 'repeated array items sampled',
+      count: stats.droppedCount,
+      sample: sample(stats.samples[0] || ''),
+    },
+  ]
+
   // Emit compact JSON here (no indentation): the goal is fewer tokens, and
   // pretty-printing a crushed array can re-inflate the token count past the
   // original on minified input. Small arrays/objects still get pretty output.
   return {
     compressed: JSON.stringify(result),
-    dropped: [
-      {
-        reason: 'repeated array items sampled',
-        count: droppedCount,
-        sample: sample(JSON.stringify(data[middleStart] ?? data[headCount])),
-      },
-    ],
-    transforms: [`json:crush(${original}->${kept.length})`],
+    dropped,
+    transforms: [`json:recursiveCrush(dropped=${stats.droppedCount})`],
   }
 }
